@@ -1,0 +1,173 @@
+/* ---------- CPU Casinos ---------- */
+
+.casino-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.casino-card {
+  display: grid;
+  gap: 3px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #0b111f;
+  color: var(--text);
+  font: inherit;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.casino-card strong {
+  font-size: 12px;
+}
+
+.casino-card span {
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.casino-card small {
+  font-size: 9px;
+  color: #8a97b0;
+}
+
+.casino-card em {
+  font-style: normal;
+  font-size: 9px;
+  color: #ffb547;
+}
+
+.casino-card.active {
+  border-color: #ff2e88;
+  box-shadow: inset 0 0 0 1px rgba(255, 46, 136, 0.25), 0 0 22px rgba(255, 46, 136, 0.12);
+}
+
+.bet-panel {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #0b111f;
+  padding: 10px 12px;
+  display: grid;
+  gap: 7px;
+}
+
+.bet-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.bet-label {
+  margin-right: 4px;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.bet-chip {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #141d30;
+  color: var(--text);
+  font: inherit;
+  font-size: 10px;
+  padding: 5px 9px;
+  cursor: pointer;
+}
+
+.bet-chip.active {
+  border-color: #ffd166;
+  background: #241d0d;
+  color: #ffd166;
+}
+
+.bet-chip:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.lock-hint {
+  margin: 0;
+  font-size: 10px;
+  color: #ff9f6b;
+}
+
+.spin-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 8px;
+}
+
+.spin-cta {
+  border: none;
+  border-radius: 12px;
+  padding: 13px;
+  font: inherit;
+  font-size: 20px;
+  font-weight: bold;
+  letter-spacing: 0.2em;
+  color: #14060b;
+  background: linear-gradient(180deg, #ff4d8f, #d10f55);
+  box-shadow: 0 0 28px rgba(255, 46, 136, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+}
+
+.spin-cta:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.spin-cta:disabled {
+  opacity: 0.4;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.auto-cta {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #0b111f;
+  color: var(--muted);
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.auto-cta.on {
+  border-color: #00ffcc;
+  background: #0d2a24;
+  color: #00ffcc;
+}
+
+.auto-cta:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.round-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: #080d17;
+  padding: 8px 10px;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.round-strip strong {
+  color: #9ff0bd;
+}
+
+.round-strip.near {
+  border-color: #ff4d6d;
+  color: #ffc2cd;
+}
+

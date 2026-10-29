@@ -1,0 +1,147 @@
+.game-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 55fr) minmax(0, 45fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.stage-column {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  position: sticky;
+  top: 12px;
+}
+
+.stage-frame {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(13, 19, 33, 0.98), rgba(6, 9, 16, 0.98));
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.stage-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 2px 4px;
+}
+
+.segmented {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #080d17;
+}
+
+.segmented button {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  padding: 5px 11px;
+  cursor: pointer;
+}
+
+.segmented button.active {
+  background: linear-gradient(180deg, #00ffcc, #12c7a4);
+  color: #04120f;
+  font-weight: bold;
+  box-shadow: 0 0 18px rgba(0, 255, 204, 0.3);
+}
+
+.stage-caption {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.stage-host {
+  min-height: 612px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 12px;
+  background: radial-gradient(circle at 50% 40%, #0b1120, #04060b 72%);
+}
+
+.stage-host canvas {
+  display: block;
+  max-width: 100%;
+  height: auto !important;
+}
+
+.stage-placeholder {
+  place-items: center;
+  text-align: center;
+  padding: 24px;
+}
+
+.stage-placeholder strong {
+  display: block;
+  margin: 8px 0 6px;
+  font-size: 22px;
+  letter-spacing: 0.16em;
+  color: var(--gold);
+}
+
+.stage-placeholder p {
+  max-width: 34ch;
+  margin: 0 auto;
+}
+
+.game-tables-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 0 4px;
+}
+
+.table-actions button {
+  border: 1px solid rgba(0, 255, 204, 0.35);
+  border-radius: 8px;
+  background: #0b1720;
+  color: #d7fff6;
+  font: inherit;
+  font-size: 11px;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+
+.table-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.table-host {
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 12px;
+  background: radial-gradient(circle at 50% 40%, #0b1120, #04060b 72%);
+}
+
+.table-host canvas {
+  display: block;
+  max-width: 100%;
+  height: auto !important;
+}
+

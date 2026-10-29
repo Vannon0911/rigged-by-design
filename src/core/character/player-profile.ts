@@ -4,6 +4,7 @@ import { DEFAULT_APPEARANCE, resolveVenue, type Appearance, type VenueId } from 
 import type { Ledger, LedgerEntry } from '../economy/ledger';
 import type { VaCoinMicro } from '../economy/vacoin';
 import {
+  PLAYER_MODS,
   collectEffects,
   cosmeticsFor,
   getPlayerMod,
@@ -16,6 +17,15 @@ import {
 
 export const MAX_EQUIPPED_PLAYER_MODS = 4;
 export const SUSPICION_MAX = 100;
+
+export interface PlayerProfileState {
+  readonly appearance: Appearance;
+  readonly equipped: readonly PlayerModId[];
+  readonly suspicion: number;
+  readonly reputation: number;
+  readonly lockoutUntilTick: number;
+  readonly lossStreak: number;
+}
 
 export interface ModUseResult {
   readonly suspicion: number;
@@ -72,6 +82,32 @@ export class PlayerProfile {
     return this.#lockoutUntilTick;
   }
   get venue(): VenueId { return resolveVenue(this.#reputation); }
+
+  toState(): PlayerProfileState {
+    return {
+      appearance: this.appearance,
+      equipped: [...this.#equipped],
+      suspicion: this.#suspicion,
+      reputation: this.#reputation,
+      lockoutUntilTick: this.#lockoutUntilTick,
+      lossStreak: this.#lossStreak,
+    };
+  }
+
+  loadState(state: Partial<PlayerProfileState>): void {
+    const safe = (value: number | undefined): number => (Number.isFinite(value) ? Math.max(0, Math.floor(value!)) : 0);
+    this.#appearance = { ...DEFAULT_APPEARANCE, ...state.appearance };
+    this.#equipped.length = 0;
+    for (const id of state.equipped ?? []) {
+      if (this.#equipped.length >= MAX_EQUIPPED_PLAYER_MODS) break;
+      if (this.#equipped.includes(id) || !PLAYER_MODS.some((mod) => mod.id === id)) continue;
+      this.#equipped.push(id);
+    }
+    this.#suspicion = Math.min(SUSPICION_MAX, safe(state.suspicion));
+    this.#reputation = safe(state.reputation);
+    this.#lockoutUntilTick = safe(state.lockoutUntilTick);
+    this.#lossStreak = safe(state.lossStreak);
+  }
 
   setAppearance(patch: Partial<Appearance>): void {
     this.#appearance = { ...this.#appearance, ...patch };

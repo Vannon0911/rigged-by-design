@@ -9,15 +9,17 @@ import { TopBar } from './ui/hud/top-bar';
 import { TransactionTicker } from './ui/hud/transaction-ticker';
 import { StageBar, type StageMode } from './ui/stage-bar';
 import { BuildAndManage } from './ui/tabs/build-and-manage';
+import { CharacterTab } from './ui/tabs/character-tab';
 import { HustleAndGamble } from './ui/tabs/hustle-and-gamble';
 import { WorkshopPage } from './ui/workshop';
 
-type TabId = 'HUSTLE' | 'BUILD' | 'WORKSHOP';
+type TabId = 'HUSTLE' | 'BUILD' | 'WORKSHOP' | 'CHARACTER';
 
 const TABS: readonly { id: TabId; label: string }[] = [
   { id: 'HUSTLE', label: '1. Arbeiten & CPU-Casinos' },
   { id: 'BUILD', label: '2. Eigenes Casino & Baumarkt' },
   { id: 'WORKSHOP', label: '3. RNG-Labor & Werkstatt' },
+  { id: 'CHARACTER', label: '4. Charakter & Mods' },
 ];
 
 export default function App() {
@@ -48,7 +50,7 @@ export default function App() {
   }, [tab]);
 
   useEffect(() => {
-    if (stageMode === 'TABLES') return;
+    if (tab === 'CHARACTER' || stageMode === 'TABLES') return;
     const host = hostRef.current;
     if (!host) return;
     let disposed = false;
@@ -89,7 +91,7 @@ export default function App() {
       floorView = new FloorMiniView(createdApp, 48);
       floorView.container.position.set(16, 16);
       createdApp.stage.addChild(floorView.container);
-      floorView.update(gameStore.floor);
+      floorView.update(gameStore.floorView);
       floorRef.current = floorView;
     };
 
@@ -104,10 +106,10 @@ export default function App() {
       if (app) app.destroy(true, { children: true });
       host.replaceChildren();
     };
-  }, [stageMode, handleSpin]);
+  }, [stageMode, handleSpin, tab]);
 
   useEffect(() => {
-    floorRef.current?.update(gameStore.floor);
+    floorRef.current?.update(gameStore.floorView);
   }, [game]);
 
   const stageCaption = stageMode === 'SLOT'
@@ -133,9 +135,19 @@ export default function App() {
         <section className="stage-column">
           <div className="stage-frame">
             <StageBar mode={stageMode} caption={stageCaption} onSelect={setStageMode} />
-            {stageMode === 'TABLES'
-              ? <GameTablesPanel />
-              : <div className="stage-host" ref={hostRef} aria-label="PixiJS Bühne" />}
+            {tab === 'CHARACTER'
+              ? (
+                <div key="character-stage" className="stage-host stage-placeholder">
+                  <div>
+                    <span className="stage-caption">Spieler-Profil</span>
+                    <strong>Charakter-Labor</strong>
+                    <p className="hint">Aussehen, Player-Mods und Suspicion rechts bearbeiten.</p>
+                  </div>
+                </div>
+              )
+              : stageMode === 'TABLES'
+                ? <GameTablesPanel />
+                : <div key="pixi-stage" className="stage-host" ref={hostRef} aria-label="PixiJS Bühne" />}
           </div>
           <TransactionTicker entries={game.lastEntries} />
         </section>
@@ -159,6 +171,7 @@ export default function App() {
             {tab === 'HUSTLE' && <HustleAndGamble onSpin={handleSpin} />}
             {tab === 'BUILD' && <BuildAndManage />}
             {tab === 'WORKSHOP' && <WorkshopPage cash={game.cash} />}
+            {tab === 'CHARACTER' && <CharacterTab />}
           </div>
         </aside>
       </div>

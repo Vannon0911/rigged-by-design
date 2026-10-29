@@ -6,19 +6,8 @@ import {
   MINTING_ACCOUNTS,
   type AccountId,
 } from '../ledger';
+import { Prng } from '../../rng/prng';
 import { addVC, fromVC, mulVC, toVCString, type VaCoinMicro } from '../vacoin';
-
-/** Deterministischer PRNG (mulberry32), damit der Fuzz-Test reproduzierbar bleibt. */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 const COVERED_ACCOUNTS = ACCOUNTS.filter((account) => !MINTING_ACCOUNTS.includes(account));
 
@@ -86,7 +75,7 @@ describe('ledger (doppelte Buchfuehrung)', () => {
   });
 
   it('bleibt nach 1.000 zufaelligen Buchungen integer und integer (Integritaet)', () => {
-    const random = mulberry32(0x5eed1e55);
+    const random = new Prng(0x5eed1e55);
     const ledger = new Ledger({
       PLAYER_CASH: fromVC(1000),
       CASINO_VAULT: fromVC(5000),
@@ -96,13 +85,13 @@ describe('ledger (doppelte Buchfuehrung)', () => {
     let booked = 0;
 
     for (let i = 0; i < 1000; i += 1) {
-      const from = COVERED_ACCOUNTS[Math.floor(random() * COVERED_ACCOUNTS.length)] as AccountId;
-      const to = COVERED_ACCOUNTS[Math.floor(random() * COVERED_ACCOUNTS.length)] as AccountId;
+      const from = COVERED_ACCOUNTS[Math.floor(random.nextFloat() * COVERED_ACCOUNTS.length)] as AccountId;
+      const to = COVERED_ACCOUNTS[Math.floor(random.nextFloat() * COVERED_ACCOUNTS.length)] as AccountId;
       if (from === to) continue;
       const balance = ledger.getBalance(from);
       if (balance <= 0) continue;
 
-      const amount = (Math.floor(random() * balance) + 1) as VaCoinMicro;
+      const amount = (Math.floor(random.nextFloat() * balance) + 1) as VaCoinMicro;
       ledger.transfer(from, to, amount, `fuzz #${i}`, i);
       booked += 1;
       expect(ledger.verifyLedgerIntegrity()).toBe(true);

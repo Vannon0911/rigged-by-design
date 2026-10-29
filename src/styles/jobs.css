@@ -1,0 +1,78 @@
+/* ---------- Jobs ---------- */
+
+.job-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.job {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #0b111f;
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.job.ready {
+  border-color: rgba(0, 255, 204, 0.35);
+  box-shadow: inset 0 0 24px rgba(0, 255, 204, 0.04);
+}
+
+.job header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.job h3 {
+  margin: 0;
+  font-size: 12px;
+  color: #e8edf7;
+}
+
+.job p {
+  margin: 3px 0 0;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.job-pay {
+  font-size: 11px;
+  color: #9ff0bd;
+  white-space: nowrap;
+}
+
+.cooldown-track {
+  height: 8px;
+  border-radius: 999px;
+  background: #141d30;
+  overflow: hidden;
+}
+
+.cooldown-track span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #00ffcc, #7cf0d0);
+  transition: width 0.9s linear;
+}
+
+.job button {
+  border: 1px solid #2f6b4c;
+  border-radius: 8px;
+  background: #0d2a1e;
+  color: #9ff0bd;
+  font: inherit;
+  font-size: 11px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.job button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+

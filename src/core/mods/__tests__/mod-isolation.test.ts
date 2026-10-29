@@ -3,28 +3,13 @@ import { BOUNCER_PENALTY_BPS, CPU_CASINO_LOCKOUT_SECONDS } from '../../character
 import { MAX_EQUIPPED_PLAYER_MODS, PlayerProfile } from '../../character/player-profile';
 import { Ledger } from '../../economy/ledger';
 import { BPS_DENOMINATOR, fromVC, toVCString, type VaCoinMicro } from '../../economy/vacoin';
+import { Prng } from '../../rng/prng';
 import { collectEffects, NEUTRAL_EFFECTS, PLAYER_MODS, suspicionForUse, type PlayerModId } from '../player-mods';
-
-function mulberry32(seed: number) {
-  let a = seed >>> 0;
-  return {
-    nextFloat(): number {
-      a = (a + 0x6d2b79f5) >>> 0;
-      let t = a;
-      t = Math.imul(t ^ (t >>> 15), t | 1);
-      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    },
-    nextInt(min: number, max: number): number {
-      return min + Math.floor(this.nextFloat() * (max - min + 1));
-    },
-  };
-}
 
 /** Einfaches CPU-Wuerfelspiel: Wette auf 4-6, Auszahlung 2x (plus Mod-Bonus). */
 function playCpuDice(equipped: readonly PlayerModId[], rolls: number, seed: number) {
   const effects = collectEffects(equipped, 'CPU_CASINO_PLAYER');
-  const prng = mulberry32(seed);
+  const prng = new Prng(seed);
   let wins = 0;
   for (let i = 0; i < rolls; i += 1) {
     const raw = prng.nextInt(1, 6);
@@ -39,7 +24,7 @@ function playCpuDice(equipped: readonly PlayerModId[], rolls: number, seed: numb
 /** Besucher-Spin im eigenen Casino: gewichtete Symbole, zahlt nach Tabelle. */
 function visitorSpins(equipped: readonly PlayerModId[], spins: number, seed: number): number[] {
   const effects = collectEffects(equipped, 'OWN_CASINO_VISITOR');
-  const prng = mulberry32(seed);
+  const prng = new Prng(seed);
   const weights = [50, 30 + Math.round((30 * effects.mediumWeightBonusBps) / BPS_DENOMINATOR), 15, 5];
   const total = weights.reduce((sum, weight) => sum + weight, 0);
   const pays = [0, 2, 5, 20].map((pay) =>
