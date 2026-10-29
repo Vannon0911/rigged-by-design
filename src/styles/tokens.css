@@ -1,0 +1,20 @@
+:root {
+  color-scheme: dark;
+  --bg: #07050c;
+  --bg-deep: #040208;
+  --panel: #120b1d;
+  --panel-2: #1a1028;
+  --line: #2b1b3c;
+  --line-strong: #4a2f66;
+  --text: #f1e9fb;
+  --muted: #9c8bb4;
+  --neon: #00ffcc;
+  --hot: #ff2e88;
+  --gold: #ffd166;
+  --danger: #ff6b81;
+  --radius: 14px;
+  --radius-sm: 9px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--sans);
+}

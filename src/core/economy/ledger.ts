@@ -1,35 +1,27 @@
 /**
- * Doppelte Buchfuehrung fuer VaCoin. Headless: kein DOM, kein React, kein Pixi.
- *
- * Konten (jede Bewegung ist ein Transfer zwischen zwei Konten):
- *  PLAYER_CASH      - Guthaben des Spielers
- *  CASINO_VAULT     - eigenes Deckungskapital des Casinos
- *  CPU_CASINO_POOL  - Pool des CPU-Gegencasinos
- *  VISITOR_WALLET   - gepooltes Bargeld der Besucher auf dem Floor
- *  PENDING_PAYOUT   - reservierte Gewinne, die der Spieler noch auszahlen muss
- *  EXTERNAL_WORK    - Aussenwelt: einzige Quelle/Senke fuer neues Geld (darf negativ sein)
- *  SHOP_VENDOR      - Shop-/Vendor-Konto
- *
- * Geldschoepfung ist damit keine Buchung "aus dem Nichts", sondern eine Buchung
- * gegen EXTERNAL_WORK. Alle anderen Konten duerfen niemals negativ werden.
+ * Doppelte Buchfuehrung fuer VaCoin. Konten sind dynamisch, damit jeder Gast
+ * ein eigenes Wallet und eine eigene Auszahlung besitzt. Kein Geld entsteht
+ * ausserhalb einer Buchung gegen EXTERNAL_WORLD.
  */
 import { addVC, canAfford, subVC, toVCString, ZERO_VC, type VaCoinMicro } from './vacoin';
 
-export const ACCOUNTS = [
-  'PLAYER_CASH',
-  'CASINO_VAULT',
-  'CPU_CASINO_POOL',
-  'VISITOR_WALLET',
-  'PENDING_PAYOUT',
-  'EXTERNAL_WORK',
-  'SHOP_VENDOR',
+export const BASE_ACCOUNTS = [
+  'EXTERNAL_WORLD',
+  'WECHSELKASSE',
+  'HAUSKONTO',
+  'PORTEMONNAIE',
+  'SHOP',
+  'STAFF',
+  'UTILITIES',
 ] as const;
 
-export type AccountId = (typeof ACCOUNTS)[number];
-export type Balances = Readonly<Record<AccountId, VaCoinMicro>>;
+export type AccountId = string;
 
-/** Nur diese Konten sind Gegenpartei der Aussenwelt und duerfen negativ werden. */
-export const MINTING_ACCOUNTS: readonly AccountId[] = ['EXTERNAL_WORK'];
+export const MINTING_ACCOUNT = 'EXTERNAL_WORLD';
+
+export function isMintingAccount(account: AccountId): boolean {
+  return account === MINTING_ACCOUNT;
+}
 
 export class LedgerError extends Error {
   constructor(message: string) {
@@ -60,85 +52,71 @@ export interface LedgerEntry {
   readonly to: AccountId;
   readonly amount: VaCoinMicro;
   readonly reason: string;
-  /** Unveraenderlicher Schnappschuss aller Salden nach der Buchung. */
-  readonly balancesAfter: Balances;
-}
-
-export function isMintingAccount(account: AccountId): boolean {
-  return MINTING_ACCOUNTS.includes(account);
-}
-
-function emptyBalances(): Record<AccountId, VaCoinMicro> {
-  const balances = {} as Record<AccountId, VaCoinMicro>;
-  for (const account of ACCOUNTS) balances[account] = ZERO_VC;
-  return balances;
 }
 
 export class Ledger {
-  readonly #balances: Record<AccountId, VaCoinMicro> = emptyBalances();
+  readonly #balances = new Map<AccountId, VaCoinMicro>();
   readonly #entries: LedgerEntry[] = [];
   #seq = 0;
 
-  /** Startkapital wird als Buchung gegen EXTERNAL_WORK gebucht, nicht still gesetzt. */
-  constructor(opening?: Partial<Record<AccountId, VaCoinMicro>>) {
+  constructor(opening?: Readonly<Record<AccountId, VaCoinMicro>>) {
+    for (const account of BASE_ACCOUNTS) this.#balances.set(account, ZERO_VC);
     if (!opening) return;
-    for (const account of ACCOUNTS) {
-      if (account === 'EXTERNAL_WORK') continue;
-      const amount = opening[account];
-      if (amount === undefined || amount === ZERO_VC) continue;
-      this.transfer('EXTERNAL_WORK', account, amount, 'opening balance', 0);
+    for (const [account, amount] of Object.entries(opening)) {
+      if (account === MINTING_ACCOUNT || !amount) continue;
+      this.transfer(MINTING_ACCOUNT, account, amount, 'opening balance', 0);
     }
   }
 
-  getBalance(account: AccountId): VaCoinMicro {
-    return this.#balances[account];
+  openAccount(account: AccountId): void {
+    if (!account.trim()) throw new LedgerError('Konto darf nicht leer sein');
+    if (!this.#balances.has(account)) this.#balances.set(account, ZERO_VC);
   }
 
-  snapshot(): Balances {
-    return Object.freeze({ ...this.#balances });
+  hasAccount(account: AccountId): boolean {
+    return this.#balances.has(account);
+  }
+
+  get accounts(): readonly AccountId[] {
+    return [...this.#balances.keys()];
+  }
+
+  getBalance(account: AccountId): VaCoinMicro {
+    return this.#balances.get(account) ?? ZERO_VC;
+  }
+
+  snapshot(): Readonly<Record<AccountId, VaCoinMicro>> {
+    return Object.freeze(Object.fromEntries(this.#balances));
   }
 
   get entries(): readonly LedgerEntry[] {
     return Object.freeze([...this.#entries]);
   }
 
-  /** Umlaufendes Geld = Summe aller Nicht-Minting-Konten. */
   get circulating(): VaCoinMicro {
     let total = ZERO_VC;
-    for (const account of ACCOUNTS) {
-      if (isMintingAccount(account)) continue;
-      total = addVC(total, this.#balances[account]);
+    for (const [account, balance] of this.#balances) {
+      if (!isMintingAccount(account)) total = addVC(total, balance);
     }
     return total;
   }
 
-  transfer(
-    from: AccountId,
-    to: AccountId,
-    amount: VaCoinMicro,
-    reason: string,
-    tick: number,
-  ): LedgerEntry {
-    if (!ACCOUNTS.includes(from)) throw new LedgerError(`transfer: unbekanntes Konto "${from}"`);
-    if (!ACCOUNTS.includes(to)) throw new LedgerError(`transfer: unbekanntes Konto "${to}"`);
+  transfer(from: AccountId, to: AccountId, amount: VaCoinMicro, reason: string, tick: number): LedgerEntry {
+    if (!from.trim() || !to.trim()) throw new LedgerError('transfer: Konto fehlt');
     if (from === to) throw new LedgerError('transfer: Quelle und Ziel muessen verschieden sein');
-    if (typeof reason !== 'string' || reason.trim() === '') {
-      throw new LedgerError('transfer: Grund darf nicht leer sein');
-    }
-    if (!Number.isSafeInteger(tick) || tick < 0) {
-      throw new LedgerError(`transfer: tick muss eine nicht-negative Ganzzahl sein, erhalten ${String(tick)}`);
-    }
-    if (!Number.isSafeInteger(amount) || amount <= 0) {
-      throw new LedgerError(`transfer: Betrag muss eine positive Ganzzahl sein, erhalten ${String(amount)}`);
-    }
+    if (!reason.trim()) throw new LedgerError('transfer: Grund darf nicht leer sein');
+    if (!Number.isSafeInteger(tick) || tick < 0) throw new LedgerError('transfer: tick ungueltig');
+    if (!Number.isSafeInteger(amount) || amount <= 0) throw new LedgerError('transfer: Betrag muss positiv sein');
+    this.openAccount(from);
+    this.openAccount(to);
 
-    const available = this.#balances[from];
+    const available = this.#balances.get(from) ?? ZERO_VC;
     if (!isMintingAccount(from) && !canAfford(available, amount)) {
       throw new InsufficientFundsError(from, amount, available, reason);
     }
 
-    this.#balances[from] = subVC(available, amount);
-    this.#balances[to] = addVC(this.#balances[to], amount);
+    this.#balances.set(from, subVC(available, amount));
+    this.#balances.set(to, addVC(this.#balances.get(to) ?? ZERO_VC, amount));
 
     const entry: LedgerEntry = Object.freeze({
       seq: this.#seq,
@@ -147,38 +125,33 @@ export class Ledger {
       to,
       amount,
       reason: reason.trim(),
-      balancesAfter: this.snapshot(),
     });
     this.#seq += 1;
     this.#entries.push(entry);
     return entry;
   }
 
-  /**
-   * Prueft die Buchhaltung komplett neu aus dem Log:
-   * 1. jede Buchung ist gueltig (positiv, zwei verschiedene Konten),
-   * 2. kein gedecktes Konto war je negativ,
-   * 3. nachgespielte Salden == aktuelle Salden,
-   * 4. Summe aller Kontenbewegungen ist exakt 0 (nichts gedruckt, nichts vernichtet).
-   */
   verifyLedgerIntegrity(): boolean {
-    const replay = emptyBalances();
+    const replay = new Map<AccountId, VaCoinMicro>();
+    for (const account of BASE_ACCOUNTS) replay.set(account, ZERO_VC);
     for (const entry of this.#entries) {
       if (!Number.isSafeInteger(entry.amount) || entry.amount <= 0) return false;
       if (entry.from === entry.to) return false;
-      replay[entry.from] = (replay[entry.from] - entry.amount) as VaCoinMicro;
-      replay[entry.to] = (replay[entry.to] + entry.amount) as VaCoinMicro;
-      if (!isMintingAccount(entry.from) && replay[entry.from] < 0) return false;
-      if (!Number.isSafeInteger(replay[entry.from]) || !Number.isSafeInteger(replay[entry.to])) {
-        return false;
+      for (const account of [entry.from, entry.to]) {
+        if (!replay.has(account)) replay.set(account, ZERO_VC);
       }
+      const from = (replay.get(entry.from) ?? 0) - entry.amount;
+      const to = (replay.get(entry.to) ?? 0) + entry.amount;
+      if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to)) return false;
+      if (!isMintingAccount(entry.from) && from < 0) return false;
+      replay.set(entry.from, from as VaCoinMicro);
+      replay.set(entry.to, to as VaCoinMicro);
     }
-
     let net = 0;
-    for (const account of ACCOUNTS) {
-      if (replay[account] !== this.#balances[account]) return false;
-      if (!isMintingAccount(account) && this.#balances[account] < 0) return false;
-      net += this.#balances[account];
+    for (const [account, balance] of this.#balances) {
+      if (!isMintingAccount(account) && balance < 0) return false;
+      if ((replay.get(account) ?? ZERO_VC) !== balance) return false;
+      net += balance;
     }
     return net === 0;
   }
