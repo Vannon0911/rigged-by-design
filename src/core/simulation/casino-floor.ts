@@ -1,32 +1,20 @@
 /** Eigenes Casino: 8x8-Grid, Deko-Effekte, simulierte Besucher und Tresor-Deckung. */
 import type { Ledger } from '../economy/ledger';
-import { ZERO_VC, addVC, subVC, type VaCoinMicro } from '../economy/vacoin';
+import { ZERO_VC, addVC, type VaCoinMicro } from '../economy/vacoin';
 import type { Prng } from '../rng/prng';
 import { pickWeightedIndex } from '../rng/weighted-pool';
 import { getBuildable, getOperatorMod, type BuildableId, type OperatorModId } from './catalog';
 import { playFloorGame } from './floor-games';
+import type { FloorSnapshot, FloorTickResult, PlacedItem } from './floor-types';
+import { admitVisitor, payVisitorWin, placeVisitorBet, reconcileVisitorPool, releaseVisitor } from './visitor-ledger';
 import { rollVisitor, type Visitor } from './visitors';
+
+export type { FloorSnapshot, FloorTickResult, PlacedItem } from './floor-types';
 
 const GRID = 8;
 const MAX_VISITORS = 10;
 const SPAWN_CHANCE = 0.12;
 const PATIENCE_LOSS = 4;
-
-export interface PlacedItem {
-  readonly id: number;
-  readonly buildableId: BuildableId;
-  readonly x: number;
-  readonly y: number;
-  mods: OperatorModId[];
-}
-
-export interface FloorTickResult {
-  readonly spawned: number;
-  readonly spins: number;
-  readonly bets: VaCoinMicro;
-  readonly payouts: VaCoinMicro;
-  readonly left: number;
-}
 
 type DecoKey = 'spawnBonusBps' | 'patienceLossReductionBps' | 'startingAddiction';
 
@@ -61,6 +49,26 @@ export class CasinoFloor {
   }
   get vaultBalance(): VaCoinMicro {
     return this.#ledger.getBalance('CASINO_VAULT');
+  }
+
+  snapshot(): FloorSnapshot {
+    return {
+      ticks: this.#ticks,
+      nextId: this.#nextId,
+      items: this.#items.map((item) => ({ ...item, mods: [...item.mods] })),
+      visitors: this.#visitors.map((visitor) => ({ ...visitor })),
+    };
+  }
+
+  restore(state: FloorSnapshot): void {
+    if (!Number.isInteger(state.ticks) || state.ticks < 0) throw new Error('restore: ungueltige Tick-Zahl');
+    if (!Number.isInteger(state.nextId) || state.nextId < 1) throw new Error('restore: ungueltige ID');
+    if (!Array.isArray(state.items) || !Array.isArray(state.visitors)) throw new Error('restore: ungueltiger Floor');
+    this.#ticks = state.ticks;
+    this.#nextId = state.nextId;
+    this.#items.splice(0, this.#items.length, ...state.items.map((item) => ({ ...item, mods: [...item.mods] })));
+    this.#visitors.splice(0, this.#visitors.length, ...state.visitors.map((visitor) => ({ ...visitor })));
+    reconcileVisitorPool(this.#ledger, this.#visitors, this.#ticks);
   }
 
   placeItem(buildableId: BuildableId, x: number, y: number): PlacedItem {
@@ -127,17 +135,13 @@ export class CasinoFloor {
       }
 
       const round = playFloorGame(game.buildableId, game.mods, betPerLine, this.#prng);
-      this.#ledger.transfer('EXTERNAL_WORK', 'CASINO_VAULT', round.totalBet, `visitor bet #${visitor.id}`, this.#ticks);
-      visitor.wallet = subVC(visitor.wallet, round.totalBet);
+      placeVisitorBet(this.#ledger, visitor, round.totalBet, this.#ticks);
 
       let paid = ZERO_VC;
       if (round.payout > ZERO_VC) {
         const vault = this.#ledger.getBalance('CASINO_VAULT');
         paid = round.payout <= vault ? round.payout : vault;
-        if (paid > ZERO_VC) {
-          this.#ledger.transfer('CASINO_VAULT', 'EXTERNAL_WORK', paid, `visitor win #${visitor.id}`, this.#ticks);
-        }
-        visitor.wallet = addVC(visitor.wallet, paid);
+        if (paid > ZERO_VC) payVisitorWin(this.#ledger, visitor, paid, this.#ticks);
       }
 
       visitor.spins += 1;
@@ -174,6 +178,7 @@ export class CasinoFloor {
 
   #spawnVisitor(startingAddiction: number): void {
     const visitor = rollVisitor(this.#nextId++, this.#prng, startingAddiction);
+    admitVisitor(this.#ledger, visitor, this.#ticks);
     const dispenser = this.#items.find((item) => getBuildable(item.buildableId).boozePatience > 0);
     if (dispenser) {
       const buildable = getBuildable(dispenser.buildableId);
@@ -187,6 +192,8 @@ export class CasinoFloor {
 
   #removeVisitor(id: number): void {
     const index = this.#visitors.findIndex((visitor) => visitor.id === id);
-    if (index >= 0) this.#visitors.splice(index, 1);
+    if (index < 0) return;
+    releaseVisitor(this.#ledger, this.#visitors[index]!, this.#ticks);
+    this.#visitors.splice(index, 1);
   }
 }

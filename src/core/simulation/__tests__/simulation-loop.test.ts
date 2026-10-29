@@ -86,6 +86,8 @@ describe('Simulations-Loop', () => {
     expect(floor.tickCount).toBe(400);
     expect(ledger.getBalance('CASINO_VAULT')).toBe(vaultBefore + bets - payouts);
     expect(ledger.verifyLedgerIntegrity()).toBe(true);
+    const walletTotal = floor.visitors.reduce((sum, visitor) => sum + visitor.wallet, 0);
+    expect(ledger.getBalance('VISITOR_WALLET')).toBe(walletTotal);
 
     const balances = ledger.snapshot();
     const net = Object.values(balances).reduce((sum, value) => sum + value, 0);

@@ -1,9 +1,9 @@
 /** Fremde CPU-Casinos: Einsatz buchen, Spin ausfuehren, Gewinn zurueckbuchen. */
 import type { Ledger, LedgerEntry } from '../economy/ledger';
-import { fromVC, type VaCoinMicro } from '../economy/vacoin';
+import { fromVC, mulVC, type VaCoinMicro } from '../economy/vacoin';
 import type { Prng } from '../rng/prng';
 import { spinSlot } from '../slot/slot-engine';
-import type { SlotConfig, SpinResult } from '../slot/slot-types';
+import { BASE_WEIGHTS, type SlotConfig, type SlotSymbol, type SpinResult } from '../slot/slot-types';
 
 export type CpuCasinoId = 'CPU_DIVE_BAR' | 'CPU_HIGH_ROLLER';
 
@@ -16,6 +16,13 @@ export interface CpuCasino {
   readonly maxBetVC: VaCoinMicro;
   readonly targetRtp: number;
   readonly slot: SlotConfig;
+}
+
+/** Nur Spieler-Boni: werden nie an Besucher im eigenen Casino angewendet. */
+export interface CpuPlayerBonus {
+  readonly mediumWeightBonusBps?: number;
+  readonly payoutBonusBps?: number;
+  readonly luckBiasBps?: number;
 }
 
 const FAIR_WEIGHTS = { BLANK: 20, CHERRY: 20, BELL: 20, SEVEN: 20, VACOIN_DIAMOND: 20 } as const;
@@ -81,6 +88,7 @@ export function playCpuCasinoSpin(
   ledger: Ledger,
   prng: Prng,
   tick: number,
+  bonus: CpuPlayerBonus = {},
 ): CpuSpinResult {
   const casino = getCpuCasino(casinoId);
   if (!Number.isSafeInteger(betPerLine)) throw new Error('playCpuCasinoSpin: Einsatz muss eine Ganzzahl sein');
@@ -96,11 +104,20 @@ export function playCpuCasinoSpin(
   if (!Number.isSafeInteger(totalBet)) throw new Error('playCpuCasinoSpin: Gesamteinsatz zu gross');
 
   const betEntry = ledger.transfer('PLAYER_CASH', 'CPU_CASINO_POOL', totalBet, `cpu spin ${casinoId}`, tick);
-  const spin = spinSlot({ ...casino.slot, baseBet: betPerLine }, prng, 10_000);
+  const weights: Partial<Record<SlotSymbol, number>> = { ...(casino.slot.weights ?? {}) };
+  const mediumBias = (bonus.mediumWeightBonusBps ?? 0) + (bonus.luckBiasBps ?? 0);
+  if (mediumBias > 0) {
+    for (const symbol of ['CHERRY', 'BELL', 'SEVEN'] as const) {
+      weights[symbol] = Math.round(((weights[symbol] ?? BASE_WEIGHTS[symbol]) * (10_000 + mediumBias)) / 10_000);
+    }
+  }
+  const spin = spinSlot({ ...casino.slot, baseBet: betPerLine, weights }, prng, 10_000);
+  const payout = mulVC(spin.totalPayout, 10_000 + Math.max(0, bonus.payoutBonusBps ?? 0));
+  const adjustedSpin: SpinResult = { ...spin, totalPayout: payout };
   const payoutEntry =
-    spin.totalPayout > 0
-      ? ledger.transfer('CPU_CASINO_POOL', 'PLAYER_CASH', spin.totalPayout, `cpu win ${casinoId}`, tick)
+    payout > 0
+      ? ledger.transfer('CPU_CASINO_POOL', 'PLAYER_CASH', payout, `cpu win ${casinoId}`, tick)
       : null;
 
-  return { casinoId, betPerLine, totalBet, spin, payout: spin.totalPayout, betEntry, payoutEntry };
+  return { casinoId, betPerLine, totalBet, spin: adjustedSpin, payout, betEntry, payoutEntry };
 }

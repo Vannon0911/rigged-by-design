@@ -13,6 +13,7 @@ export interface CharacterAndModsProps {
   readonly revision: number;
   readonly onBuy: (id: PlayerModId) => void;
   readonly onToggleEquip: (id: PlayerModId) => void;
+  readonly onAppearanceChange?: () => void;
 }
 
 interface RowProps<T extends string> {
@@ -44,7 +45,7 @@ function avatarState(profile: PlayerProfile): AvatarViewState {
   return { appearance: profile.appearance, cosmetics: profile.cosmetics, suspicion: profile.suspicion };
 }
 
-export function CharacterAndMods({ profile, ownedMods, cash, revision, onBuy, onToggleEquip }: CharacterAndModsProps) {
+export function CharacterAndMods({ profile, ownedMods, cash, revision, onBuy, onToggleEquip, onAppearanceChange }: CharacterAndModsProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const appRef = useRef<Application | null>(null);
   const viewRef = useRef<PlayerAvatarView | null>(null);
@@ -83,7 +84,8 @@ export function CharacterAndMods({ profile, ownedMods, cash, revision, onBuy, on
     return () => {
       disposed = true;
       viewRef.current = null;
-      appRef.current?.destroy(true, { children: true });
+      // React entfernt den Host beim Tab-Wechsel; Pixi darf das Canvas nicht doppelt lösen.
+      appRef.current?.destroy(false, { children: true });
       appRef.current = null;
     };
   }, []);
@@ -96,6 +98,7 @@ export function CharacterAndMods({ profile, ownedMods, cash, revision, onBuy, on
   const pickAppearance = <K extends keyof Appearance>(key: K, value: Appearance[K]) => {
     profile.setAppearance({ ...profile.appearance, [key]: value });
     setLocalVersion((version) => version + 1);
+    onAppearanceChange?.();
   };
 
   const effects = profile.effects;

@@ -56,6 +56,8 @@ export interface WorkResult {
   readonly ledgerEntry: LedgerEntry;
 }
 
+export type HustleSnapshot = Readonly<Record<JobId, number>>;
+
 export class HustleWork {
   readonly #ledger: Ledger;
   readonly #prng: Prng;
@@ -72,6 +74,17 @@ export class HustleWork {
 
   isReady(jobId: JobId, nowSeconds: number): boolean {
     return nowSeconds >= this.#readyAt[jobId];
+  }
+
+  snapshot(): HustleSnapshot {
+    return { ...this.#readyAt };
+  }
+
+  restore(state: Partial<Record<JobId, number>>): void {
+    for (const job of JOBS) {
+      const value = state[job.id];
+      if (typeof value === 'number' && Number.isFinite(value) && value >= 0) this.#readyAt[job.id] = value;
+    }
   }
 
   work(jobId: JobId, nowSeconds: number): WorkResult {

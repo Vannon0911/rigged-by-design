@@ -5,6 +5,7 @@
  *  PLAYER_CASH      - Guthaben des Spielers
  *  CASINO_VAULT     - eigenes Deckungskapital des Casinos
  *  CPU_CASINO_POOL  - Pool des CPU-Gegencasinos
+ *  VISITOR_WALLET   - gepooltes Bargeld der Besucher auf dem Floor
  *  EXTERNAL_WORK    - Aussenwelt: einzige Quelle/Senke fuer neues Geld (darf negativ sein)
  *  SHOP_VENDOR      - Shop-/Vendor-Konto
  *
@@ -17,6 +18,7 @@ export const ACCOUNTS = [
   'PLAYER_CASH',
   'CASINO_VAULT',
   'CPU_CASINO_POOL',
+  'VISITOR_WALLET',
   'EXTERNAL_WORK',
   'SHOP_VENDOR',
 ] as const;

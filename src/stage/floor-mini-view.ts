@@ -1,6 +1,6 @@
 /** Top-down Mini-Ansicht des 8x8-Casino-Floors mit Deko, Slots und Besuchern. */
 import { Application, Container, Graphics, Text } from 'pixi.js';
-import type { CasinoFloor, PlacedItem } from '../core/simulation/casino-floor';
+import type { FloorView, PlacedItem } from '../core/simulation/floor-types';
 import { getBuildable } from '../core/simulation/catalog';
 import { VisitorLayer } from './visitor-layer';
 
@@ -59,7 +59,7 @@ export class FloorMiniView {
     this.#app.ticker.add(this.#blink);
   }
 
-  update(floor: CasinoFloor): void {
+  update(floor: FloorView): void {
     if (this.#destroyed) return;
     this.#lastItems = floor.items;
     this.#count.text = `${floor.visitors.length}/10`;
@@ -127,7 +127,7 @@ export class FloorMiniView {
     }
   }
 
-  #spawnPopups(floor: CasinoFloor): void {
+  #spawnPopups(floor: FloorView): void {
     for (const visitor of floor.visitors) {
       const position = this.#visitorLayer.positionOf(visitor.id);
       if (!position) continue;
