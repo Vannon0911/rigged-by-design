@@ -1,126 +1,135 @@
-import { useCallback, useState } from 'react';
-import type { PlacedItem } from './core/simulation/floor-types';
-import type { CpuTableGame } from './core/simulation/cpu-tables';
-import { FloorStage } from './stage/floor-stage';
-import { playerStore, usePlayerStore } from './store/player-store';
+import { useEffect, useRef, useState } from 'react';
+import type { ItemId } from './core/offer/catalog';
+import type { HouseId } from './core/visit/houses';
+import { FloorStage, type FloorStageHandle } from './stage/floor-stage';
 import { gameStore, useGameStore } from './store/use-game-store';
-import { ArcadeBar, type HudSection } from './ui/hud/arcade-bar';
-import { ProgressionBanner } from './ui/hud/progression-banner';
-import { TransactionTicker } from './ui/hud/transaction-ticker';
-import { CpuCasinoDock } from './ui/dock/cpu-casino-dock';
-import { FloorActionPanel, type FloorSelection } from './ui/floor-action-panel';
-import { PlayerPlayDock } from './ui/player-play-dock';
-import { PlayStage, type PlayGame } from './ui/stage/play-stage';
-import { BuildAndManage } from './ui/tabs/build-and-manage';
-import { CharacterTab } from './ui/tabs/character-tab';
-import { WorkshopPage } from './ui/workshop';
+import { BuildTray } from './ui/build-tray';
+import { Hud } from './ui/hud';
+import { BuildPopup } from './ui/popup-build';
+import { GuestsPopup } from './ui/popup-guests';
+import { MachinePopup } from './ui/popup-machine';
+import { VisitPopup } from './ui/popup-visit';
 
-type StageMode = 'FLOOR' | 'PLAY';
+type Popup =
+  | { readonly kind: 'build' }
+  | { readonly kind: 'guests' }
+  | { readonly kind: 'visit' }
+  | { readonly kind: 'machine'; readonly id: number }
+  | null;
 
 export default function App() {
-  const game = useGameStore();
-  const player = usePlayerStore();
-  const [mode, setMode] = useState<StageMode>('FLOOR');
-  const [section, setSection] = useState<HudSection>('CASINO');
-  const [playGame, setPlayGame] = useState<PlayGame>('SLOT');
-  const [source, setSource] = useState<'CPU' | 'OWN'>('CPU');
-  const [selection, setSelection] = useState<FloorSelection | null>(null);
+  const snapshot = useGameStore();
+  const [popup, setPopup] = useState<Popup>(null);
+  const [placing, setPlacing] = useState<ItemId | null>(null);
+  const floorRef = useRef<FloorStageHandle>(null);
 
-  const go = (next: HudSection): void => {
-    setSection(next);
-    setSelection(null);
-    if (next === 'CPU') { setMode('PLAY'); setPlayGame('SLOT'); setSource('CPU'); }
-    else setMode('FLOOR');
+  useEffect(() => {
+    if (!snapshot.notice) return;
+    const id = setTimeout(() => gameStore.dismissNotice(), 6000);
+    return () => clearTimeout(id);
+  }, [snapshot.notice]);
+
+  const placeAt = (itemId: ItemId, x: number, y: number): void => {
+    gameStore.placeItem(itemId, x, y);
+    setPlacing(null);
   };
-  const openTable = (table: CpuTableGame): void => { setPlayGame(table); setSource('CPU'); setMode('PLAY'); };
-  const openFloorItem = useCallback((item: PlacedItem): void => {
-    setSelection({ x: item.x, y: item.y, item });
-    setMode('FLOOR');
-  }, []);
-  const openEmptyCell = useCallback((x: number, y: number): void => {
-    setSelection({ x, y });
-    setMode('FLOOR');
-  }, []);
-  const openWorkshop = (): void => { setSection('WORKSHOP'); setMode('FLOOR'); setSelection(null); };
-  const openItemPlay = (kind: 'SLOT' | 'SHELL' | 'DICE' | 'ROULETTE' | 'BLACKJACK' | 'POKER'): void => {
-    setPlayGame(kind);
-    setSource('OWN');
-    setMode('PLAY');
-    setSelection(null);
+
+  const dropItem = (itemId: ItemId, clientX: number, clientY: number): void => {
+    const cell = floorRef.current?.cellAt(clientX, clientY);
+    if (cell) placeAt(itemId, cell.x, cell.y);
   };
+
+  const activeMachine = popup?.kind === 'machine'
+    ? snapshot.machines.find((machine) => machine.id === popup.id) ?? null
+    : null;
 
   return (
-    <div className="casino-app">
-      <ArcadeBar
-        cash={game.cash}
-        vault={game.vault}
-        visitors={game.visitors.length}
-        avgAddiction={game.avgAddiction}
-        ledgerOk={game.ledgerOk}
-        notice={game.notice}
-        section={section}
-        onSection={go}
-        onDeposit={() => gameStore.moveToVault('IN')}
-        onWithdraw={() => gameStore.moveToVault('OUT')}
+    <div className="app">
+      <Hud
+        snapshot={snapshot}
+        onBuild={() => setPopup({ kind: 'build' })}
+        onGuests={() => setPopup({ kind: 'guests' })}
+        onVisit={() => setPopup({ kind: 'visit' })}
+        onUpgrade={() => gameStore.upgradeVenue()}
+        onWithdraw={() => gameStore.withdrawVault()}
+        onPayAll={() => gameStore.payAllVisitors()}
       />
 
-      <div className="casino-main">
-        <section className="stage-shell">
-          <div className="stage-modebar">
-            <div className="stage-switch">
-              <button type="button" className={mode === 'FLOOR' ? 'active' : ''} onClick={() => setMode('FLOOR')}>DEIN CASINO</button>
-              <button type="button" className={mode === 'PLAY' ? 'active' : ''} onClick={() => setMode('PLAY')}>SELBER SPIELEN</button>
-            </div>
-            <span>{game.floorSize}×{game.floorSize} GRID · {game.placements.length} OBJEKTE · {game.visitors.length} GÄSTE</span>
-            <strong>{game.notice}</strong>
+      <main className="stage-wrap">
+        <FloorStage
+          ref={floorRef}
+          snapshot={snapshot}
+          onMachine={(id) => setPopup({ kind: 'machine', id })}
+          onEmpty={(x, y) => {
+            if (placing) placeAt(placing, x, y);
+            else setPopup({ kind: 'build' });
+          }}
+        />
+        {placing && (
+          <div className="place-hint">
+            Klicke ein freies Feld für dein Objekt.
+            <button type="button" className="link" onClick={() => setPlacing(null)}>abbrechen</button>
           </div>
+        )}
+        {snapshot.notice && (
+          <button type="button" className="notice" onClick={() => gameStore.dismissNotice()}>
+            {snapshot.notice}
+          </button>
+        )}
+      </main>
 
-          <div className="stage-body">
-            {mode === 'FLOOR' ? (
-              <FloorStage
-                floor={gameStore.floorView}
-                events={game.floorEvents}
-                avatar={{ appearance: player.profile.appearance, cosmetics: player.profile.cosmetics, suspicion: player.profile.suspicion }}
-                revision={game}
-                onEmptyCell={openEmptyCell}
-                onItem={openFloorItem}
-              />
-            ) : (
-              <PlayStage game={playGame} source={source} onGame={setPlayGame} onSource={setSource} onExit={() => setMode('FLOOR')} />
-            )}
+      <BuildTray
+        venueTier={snapshot.venueTier}
+        cash={snapshot.cash}
+        selected={placing}
+        onSelect={(id) => setPlacing(id)}
+        onDrop={dropItem}
+      />
 
-            {mode === 'FLOOR' && selection && (
-              <FloorActionPanel
-                selection={selection}
-                tier={game.venueTier}
-                cash={game.cash}
-                events={game.floorEvents}
-                onClose={() => setSelection(null)}
-                onWorkshop={openWorkshop}
-                onPlay={openItemPlay}
-              />
-            )}
-            {mode === 'PLAY' && (
-              <PlayerPlayDock
-                profile={player.profile}
-                revision={player.revision}
-                onUseMod={(id) => playerStore.useMod(id, gameStore.ledger, gameStore.tickCount)}
-              />
-            )}
-          </div>
-        </section>
+      {popup?.kind === 'build' && (
+        <BuildPopup
+          cash={snapshot.cash}
+          venueTier={snapshot.venueTier}
+          ownedReels={snapshot.ownedReels.length}
+          onClose={() => setPopup(null)}
+          onSelectItem={(id) => { setPlacing(id); setPopup(null); }}
+          onBuyReel={(id) => gameStore.buyReel(id)}
+        />
+      )}
 
-        <aside className="dock-shell">
-          <div className="dock-scroll">
-            <ProgressionBanner />
-            {section === 'CASINO' && <BuildAndManage />}
-            {section === 'CPU' && <CpuCasinoDock onSlot={() => { setMode('PLAY'); setPlayGame('SLOT'); setSource('CPU'); }} onTable={openTable} />}
-            {section === 'WORKSHOP' && <WorkshopPage cash={game.cash} />}
-            {section === 'CHARACTER' && <CharacterTab />}
-          </div>
-          <TransactionTicker entries={game.lastEntries} />
-        </aside>
-      </div>
+      {popup?.kind === 'guests' && (
+        <GuestsPopup
+          visitors={snapshot.visitors}
+          onPay={(id) => gameStore.payVisitor(id)}
+          onPayAll={() => gameStore.payAllVisitors()}
+          onClose={() => setPopup(null)}
+        />
+      )}
+
+      {popup?.kind === 'visit' && (
+        <VisitPopup
+          venueTier={snapshot.venueTier}
+          cash={snapshot.cash}
+          lastHouse={snapshot.lastHouse}
+          onSpin={(houseId: HouseId, bet) => gameStore.visit(houseId, bet)}
+          onClose={() => setPopup(null)}
+        />
+      )}
+
+      {activeMachine && (
+        <MachinePopup
+          machine={activeMachine}
+          venueTier={snapshot.venueTier}
+          ownedReels={snapshot.ownedReels}
+          cash={snapshot.cash}
+          onClose={() => setPopup(null)}
+          onSwapReel={(slot, reelId) => gameStore.swapReel(activeMachine.id, slot, reelId)}
+          onAddReel={() => gameStore.addReelSlot(activeMachine.id)}
+          onRemoveReel={(slot) => gameStore.removeReel(activeMachine.id, slot)}
+          onInstallMod={(modId) => gameStore.installMod(activeMachine.id, modId)}
+          onSetBet={(bet) => gameStore.setBaseBet(activeMachine.id, bet)}
+        />
+      )}
     </div>
   );
 }

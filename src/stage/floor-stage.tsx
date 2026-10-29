@@ -1,57 +1,59 @@
-/** Zentraler Pixi-Floor: gross, responsiv und mit Klick-Hit-Testing fuer Bauen und Geraete. */
-import { useEffect, useRef } from 'react';
+/** Hostet die Pixi-Bühne und reicht die Zellposition für Drag and Drop nach außen. */
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { Application } from 'pixi.js';
-import type { FloorRoundEvent } from '../core/simulation/floor-events';
-import type { FloorView, PlacedItem } from '../core/simulation/floor-types';
-import { CasinoFloorView } from './casino-floor-view';
-import type { AvatarViewState } from './player-avatar-view';
+import type { GameSnapshot } from '../store/types';
+import { FloorView, type CellPos } from './floor-view';
 
-export interface FloorStageProps {
-  readonly floor: FloorView;
-  readonly events: readonly FloorRoundEvent[];
-  readonly avatar: AvatarViewState;
-  readonly revision: unknown;
-  readonly onEmptyCell: (x: number, y: number) => void;
-  readonly onItem: (item: PlacedItem) => void;
+export interface FloorStageHandle {
+  cellAt(clientX: number, clientY: number): CellPos | null;
 }
 
-export function FloorStage({ floor, events, avatar, revision, onEmptyCell, onItem }: FloorStageProps) {
+interface FloorStageProps {
+  readonly snapshot: GameSnapshot;
+  readonly onMachine: (id: number) => void;
+  readonly onEmpty: (x: number, y: number) => void;
+}
+
+export const FloorStage = forwardRef<FloorStageHandle, FloorStageProps>(function FloorStage(
+  { snapshot, onMachine, onEmpty },
+  ref,
+) {
   const hostRef = useRef<HTMLDivElement | null>(null);
-  const viewRef = useRef<CasinoFloorView | null>(null);
-  const callbacksRef = useRef({ onEmptyCell, onItem });
-  callbacksRef.current = { onEmptyCell, onItem };
+  const viewRef = useRef<FloorView | null>(null);
+  const callbacks = useRef({ onMachine, onEmpty });
+  callbacks.current = { onMachine, onEmpty };
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
     let disposed = false;
     let app: Application | null = null;
-    let view: CasinoFloorView | null = null;
+    let view: FloorView | null = null;
 
-    const boot = async (): Promise<void> => {
+    void (async () => {
       const created = new Application();
       await created.init({
-        background: '#05070d',
-        width: 780,
-        height: 620,
+        background: '#07040f',
+        width: 960,
+        height: 640,
         antialias: true,
         autoDensity: true,
-        resolution: window.devicePixelRatio || 1,
+        resolution: Math.min(2, window.devicePixelRatio || 1),
       });
-      if (disposed) { created.destroy(true); return; }
+      if (disposed) {
+        created.destroy(true);
+        return;
+      }
       app = created;
       host.appendChild(created.canvas);
-      view = new CasinoFloorView(created, avatar, {
-        onEmptyCell: (x, y) => callbacksRef.current.onEmptyCell(x, y),
-        onItem: (item) => callbacksRef.current.onItem(item),
+      view = new FloorView(created, {
+        onMachine: (id) => callbacks.current.onMachine(id),
+        onEmpty: (x, y) => callbacks.current.onEmpty(x, y),
       });
-      created.stage.addChild(view.container);
-      view.update(floor, events, avatar);
+      view.update(snapshot);
       viewRef.current = view;
-    };
+    })();
 
-    host.replaceChildren();
-    void boot();
     return () => {
       disposed = true;
       viewRef.current = null;
@@ -59,11 +61,16 @@ export function FloorStage({ floor, events, avatar, revision, onEmptyCell, onIte
       if (app) app.destroy(true, { children: true });
       host.replaceChildren();
     };
-  }, [floor]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
-    viewRef.current?.update(floor, events, avatar);
-  }, [floor, events, avatar, revision]);
+    viewRef.current?.update(snapshot);
+  }, [snapshot]);
 
-  return <div className="casino-canvas-host" ref={hostRef} aria-label="Klickbarer Casino-Floor" />;
-}
+  useImperativeHandle(ref, () => ({
+    cellAt: (clientX, clientY) => viewRef.current?.cellAt(clientX, clientY) ?? null,
+  }), []);
+
+  return <div className="floor-stage" ref={hostRef} aria-label="Casino-Floor" />;
+});

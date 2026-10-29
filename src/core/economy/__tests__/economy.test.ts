@@ -37,7 +37,7 @@ describe('vacoin (Mikro-Geld)', () => {
 
 describe('ledger (doppelte Buchfuehrung)', () => {
   it('verweigert Buchungen ohne Deckung und laesst kein Konto ins Minus', () => {
-    const ledger = new Ledger({ PLAYER_CASH: fromVC(100), CPU_CASINO_POOL: fromVC(50) });
+    const ledger = new Ledger({ PLAYER_CASH: fromVC(100), CASINO_VAULT: fromVC(50) });
     const before = ledger.snapshot();
     const logLength = ledger.entries.length;
 
@@ -54,8 +54,8 @@ describe('ledger (doppelte Buchfuehrung)', () => {
 
     // Konto ohne Guthaben kann gar nichts abgeben.
     expect(() =>
-      ledger.transfer('CASINO_VAULT', 'PLAYER_CASH', fromVC(0.0001), 'payout', 2),
-    ).toThrow(/Unterdeckung auf CASINO_VAULT/);
+      ledger.transfer('SHOP_VENDOR', 'PLAYER_CASH', fromVC(0.0001), 'payout', 2),
+    ).toThrow(/Unterdeckung auf SHOP_VENDOR/);
     expect(ledger.verifyLedgerIntegrity()).toBe(true);
   });
 
@@ -79,7 +79,6 @@ describe('ledger (doppelte Buchfuehrung)', () => {
     const ledger = new Ledger({
       PLAYER_CASH: fromVC(1000),
       CASINO_VAULT: fromVC(5000),
-      CPU_CASINO_POOL: fromVC(2000),
       SHOP_VENDOR: fromVC(500),
     });
     let booked = 0;
@@ -107,6 +106,6 @@ describe('ledger (doppelte Buchfuehrung)', () => {
       expect(balances[account]).toBeGreaterThanOrEqual(0);
       expect(Number.isSafeInteger(balances[account])).toBe(true);
     }
-    expect(toVCString(ledger.circulating)).toBe('8500.0000 VC');
+    expect(toVCString(ledger.circulating)).toBe('6500.0000 VC');
   });
 });

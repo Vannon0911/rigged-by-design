@@ -27,7 +27,7 @@ export interface SlotPayout {
 /** Auszahlung in Basispunkten des Linieneinsatzes (10_000 = 1x). */
 export const PAYTABLE: Readonly<Record<SlotSymbol, SlotPayout>> = {
   BLANK: {},
-  CHERRY: { two: 5_000, three: 15_000, four: 30_000, five: 50_000, six: 80_000 },
+  CHERRY: { two: 10_000, three: 15_000, four: 30_000, five: 50_000, six: 80_000 },
   BELL: { three: 40_000, four: 80_000, five: 150_000, six: 250_000 },
   SEVEN: { three: 150_000, four: 300_000, five: 500_000, six: 800_000 },
   VACOIN_DIAMOND: { three: 500_000, four: 1_000_000, five: 2_500_000, six: 5_000_000 },
