@@ -1,0 +1,45 @@
+name: CI Verify
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  push:
+    branches-ignore: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Quality Gates 1-4
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 22 mit npm-Cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install (npm ci)
+        run: npm ci
+
+      - name: 'Gate 1 - LOC-Guillotine'
+        run: npm run check:loc
+
+      - name: 'Gate 2 - Type-Safety'
+        run: npm run typecheck
+
+      - name: 'Gate 3 - RNG-, Ledger- & Regel-Beweise'
+        run: npm run test:ci
+
+      - name: 'Gate 4 - Production Build'
+        run: npm run build
