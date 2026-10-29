@@ -1,14 +1,22 @@
 /** Persistenter Spieler-Zustand: Profil, Besitz und ausgeruestete Player-Mods. */
 import { useSyncExternalStore } from 'react';
+import type { Appearance } from '../core/character/appearance';
+import {
+  PlayerProfile,
+  type PlayerProfileState,
+  type PlayerProfileView,
+} from '../core/character/player-profile';
 import type { Ledger } from '../core/economy/ledger';
-import { canAfford } from '../core/economy/vacoin';
-import { PlayerProfile, type PlayerProfileState } from '../core/character/player-profile';
+import { canAfford, type VaCoinMicro } from '../core/economy/vacoin';
 import { PLAYER_MODS, getPlayerMod, type PlayerModId } from '../core/mods/player-mods';
+import type { Prng } from '../core/rng/prng';
+import type { CpuCasinoId } from '../core/simulation/cpu-casinos';
+import { performCpuSpin, type CpuSpinOutcome } from './cpu-spin';
 
 const SAVE_KEY = 'vcoin.player.v1';
 
 export interface PlayerSnapshot {
-  readonly profile: PlayerProfile;
+  readonly profile: PlayerProfileView;
   readonly ownedMods: readonly PlayerModId[];
   readonly revision: number;
   readonly notice: string;
@@ -21,7 +29,7 @@ interface PlayerSave {
 }
 
 class PlayerStore {
-  readonly profile = new PlayerProfile();
+  readonly #profile = new PlayerProfile();
   #owned: PlayerModId[] = [];
   #notice = 'Charakter anpassen, Mods kaufen und ausruesten - sichtbar sofort.';
   #revision = 0;
@@ -62,11 +70,11 @@ class PlayerStore {
   toggleEquip(id: PlayerModId): void {
     try {
       const mod = getPlayerMod(id);
-      if (this.profile.isEquipped(id)) {
-        this.profile.unequipMod(id);
+      if (this.#profile.isEquipped(id)) {
+        this.#profile.unequipMod(id);
         this.#notice = `${mod.name} abgelegt.`;
       } else {
-        this.profile.equipMod(id, this.#owned);
+        this.#profile.equipMod(id, this.#owned);
         this.#notice = `${mod.name} ausgeruestet - Kosmetik und Effekt aktiv.`;
       }
     } catch (error) {
@@ -75,7 +83,22 @@ class PlayerStore {
     this.#commit();
   }
 
-  /** Nach direkten Profil-Aenderungen (Aussehen, Suspicion) speichern und rendern. */
+  setAppearance(appearance: Appearance): void {
+    this.#profile.setAppearance(appearance);
+    this.#commit();
+  }
+
+  spinCpu(
+    casinoId: CpuCasinoId,
+    bet: VaCoinMicro,
+    ledger: Ledger,
+    prng: Prng,
+    tick: number,
+  ): CpuSpinOutcome {
+    return performCpuSpin(casinoId, bet, ledger, prng, tick, this.#profile);
+  }
+
+  /** Nach direkten Profil-Aenderungen (Suspicion) speichern und rendern. */
   refresh(): void {
     this.#commit();
   }
@@ -91,7 +114,7 @@ class PlayerStore {
       }
       if (parsed.profile) {
         const equipped = (parsed.profile.equipped ?? []).filter((id) => this.#owned.includes(id));
-        this.profile.loadState({ ...parsed.profile, equipped });
+        this.#profile.loadState({ ...parsed.profile, equipped });
       }
     } catch {
       this.#notice = 'Spieler-Spielstand unlesbar - Standardprofil aktiv.';
@@ -101,7 +124,7 @@ class PlayerStore {
   #save(): void {
     try {
       if (typeof localStorage === 'undefined') return;
-      const save: PlayerSave = { version: 1, owned: this.#owned, profile: this.profile.toState() };
+      const save: PlayerSave = { version: 1, owned: this.#owned, profile: this.#profile.toState() };
       localStorage.setItem(SAVE_KEY, JSON.stringify(save));
     } catch {
       // Speicher voll oder blockiert: Das Spiel laeuft weiter, nur ohne Persistenz.
@@ -109,8 +132,16 @@ class PlayerStore {
   }
 
   #build(): PlayerSnapshot {
+    const profile = this.#profile;
     return {
-      profile: this.profile,
+      profile: {
+        appearance: profile.appearance,
+        cosmetics: profile.cosmetics,
+        equippedPlayerMods: profile.equippedPlayerMods,
+        suspicion: profile.suspicion,
+        effects: profile.effects,
+        luckBiasBps: profile.luckBiasBps,
+      },
       ownedMods: [...this.#owned],
       revision: this.#revision,
       notice: this.#notice,

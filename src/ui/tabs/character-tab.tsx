@@ -17,7 +17,7 @@ export function CharacterTab() {
         revision={player.revision}
         onBuy={(id) => gameStore.buyPlayerMod(id)}
         onToggleEquip={(id) => playerStore.toggleEquip(id)}
-        onAppearanceChange={() => playerStore.refresh()}
+        onAppearanceChange={(appearance) => playerStore.setAppearance(appearance)}
       />
     </div>
   );

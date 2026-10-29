@@ -1,6 +1,6 @@
 /** Arbeiten gegen die Pleite: zwei Jobs mit Cooldown, Dauer und Schlaegerei-Risiko. */
 import type { Ledger, LedgerEntry } from '../economy/ledger';
-import { fromVC, type VaCoinMicro } from '../economy/vacoin';
+import { fromVC, toVCString, type VaCoinMicro } from '../economy/vacoin';
 import type { Prng } from '../rng/prng';
 
 export type JobId = 'BOTTLE_COLLECT' | 'BOUNCER_SHIFT';
@@ -107,4 +107,13 @@ export class HustleWork {
     this.#readyAt[jobId] = readyAt;
     return { job: jobId, gross: job.payVC, net, brawl, readyAt, ledgerEntry };
   }
+}
+
+/** UI-taugliche Meldung, damit der GameStore keine Job-Texte duplizieren muss. */
+export function workWithNotice(hustle: HustleWork, jobId: JobId, clock: number): string {
+  const job = getJob(jobId);
+  const result = hustle.work(jobId, clock);
+  return result.brawl
+    ? `${job.name}: Schlaegerei! Nur ${toVCString(result.net)} netto.`
+    : `${job.name}: +${toVCString(result.net)} verdient.`;
 }

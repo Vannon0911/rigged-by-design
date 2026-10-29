@@ -1,19 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { Application } from 'pixi.js';
-import { MAX_EQUIPPED_PLAYER_MODS, type PlayerProfile } from '../../core/character/player-profile';
+import { MAX_EQUIPPED_PLAYER_MODS, type PlayerProfileView } from '../../core/character/player-profile';
 import { APPEARANCE_OPTIONS, type Appearance } from '../../core/character/appearance';
 import { PLAYER_MODS, suspicionForUse, type PlayerModId } from '../../core/mods/player-mods';
 import { toVCString, type VaCoinMicro } from '../../core/economy/vacoin';
 import { PlayerAvatarView, type AvatarViewState } from '../../stage/player-avatar-view';
 
 export interface CharacterAndModsProps {
-  readonly profile: PlayerProfile;
+  readonly profile: PlayerProfileView;
   readonly ownedMods: readonly PlayerModId[];
   readonly cash: VaCoinMicro;
   readonly revision: number;
   readonly onBuy: (id: PlayerModId) => void;
   readonly onToggleEquip: (id: PlayerModId) => void;
-  readonly onAppearanceChange?: () => void;
+  readonly onAppearanceChange?: (appearance: Appearance) => void;
 }
 
 interface RowProps<T extends string> {
@@ -41,7 +41,7 @@ function Row<T extends string>({ label, value, options, onPick }: RowProps<T>) {
   );
 }
 
-function avatarState(profile: PlayerProfile): AvatarViewState {
+function avatarState(profile: PlayerProfileView): AvatarViewState {
   return { appearance: profile.appearance, cosmetics: profile.cosmetics, suspicion: profile.suspicion };
 }
 
@@ -96,9 +96,8 @@ export function CharacterAndMods({ profile, ownedMods, cash, revision, onBuy, on
   }, [profile, revision, localVersion]);
 
   const pickAppearance = <K extends keyof Appearance>(key: K, value: Appearance[K]) => {
-    profile.setAppearance({ ...profile.appearance, [key]: value });
     setLocalVersion((version) => version + 1);
-    onAppearanceChange?.();
+    onAppearanceChange?.({ ...profile.appearance, [key]: value });
   };
 
   const effects = profile.effects;

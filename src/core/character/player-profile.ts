@@ -27,6 +27,15 @@ export interface PlayerProfileState {
   readonly lossStreak: number;
 }
 
+export interface PlayerProfileView {
+  readonly appearance: Readonly<Appearance>;
+  readonly cosmetics: readonly ModCosmetic[];
+  readonly equippedPlayerMods: readonly PlayerModId[];
+  readonly suspicion: number;
+  readonly effects: ResolvedEffects;
+  readonly luckBiasBps: number;
+}
+
 export interface ModUseResult {
   readonly suspicion: number;
   readonly ejected: boolean;

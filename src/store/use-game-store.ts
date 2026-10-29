@@ -7,9 +7,8 @@ import { CPU_CASINOS, getCpuCasino, type CpuCasinoId, type CpuSpinResult } from 
 import { CasinoFloor } from '../core/simulation/casino-floor';
 import { getBuildable, type BuildableId } from '../core/simulation/catalog';
 import type { FloorView } from '../core/simulation/floor-types';
-import { JOBS, HustleWork, type JobId } from '../core/simulation/hustle-work';
+import { HustleWork, workWithNotice, type JobId } from '../core/simulation/hustle-work';
 import type { PlayerModId } from '../core/mods/player-mods';
-import { performCpuSpin } from './cpu-spin';
 import { buildGameSnapshot } from './game-snapshot';
 import { loadGameSave, replayLedger, saveGameState } from './game-save';
 import { playerStore } from './player-store';
@@ -89,12 +88,8 @@ class GameStore {
   }
 
   work(id: JobId): void {
-    const job = JOBS.find((entry) => entry.id === id);
     try {
-      const result = this.#hustle.work(id, this.#clock);
-      this.#notice = result.brawl
-        ? `${job?.name ?? id}: Schlaegerei! Nur ${toVCString(result.net)} netto.`
-        : `${job?.name ?? id}: +${toVCString(result.net)} verdient.`;
+      this.#notice = workWithNotice(this.#hustle, id, this.#clock);
       this.#emit();
     } catch (error) {
       this.#fail(error);
@@ -103,9 +98,7 @@ class GameStore {
 
   spinCpu(): CpuSpinResult | null {
     try {
-      const outcome = performCpuSpin(
-        this.#casinoId, this.#bet, this.#ledger, this.#prng, this.#tick, playerStore.profile,
-      );
+      const outcome = playerStore.spinCpu(this.#casinoId, this.#bet, this.#ledger, this.#prng, this.#tick);
       const result = outcome.result;
       this.#lastSpin = { casinoId: this.#casinoId, bet: result.totalBet, payout: result.payout, spin: result.spin };
       this.#notice = outcome.notice;
