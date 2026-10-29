@@ -1,6 +1,7 @@
 /** Hütchenspiel: deterministische Runden, Magnet-Bias und RTP-Beweis. */
 import { ZERO_VC, addVC, fromVC, mulVC, type VaCoinMicro } from '../../economy/vacoin';
 import { resolveHitRateShift } from '../../rng/bias-policy';
+import { rollNumber } from '../../rng/number-rng';
 import { Prng } from '../../rng/prng';
 import {
   SHELL_MAX_SAMPLE,
@@ -28,10 +29,11 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function drawUnique(prng: Prng, count: number, picks: number): number[] {
-  const pool = Array.from({ length: count }, (_, index) => index);
+function drawUnique(config: ShellConfig, prng: Prng, picks: number): number[] {
+  const pool = Array.from({ length: config.cups }, (_, index) => index);
   for (let index = 0; index < picks; index += 1) {
-    const swap = prng.nextInt(index, count - 1);
+    const roll = rollNumber(0, pool.length - 1, config.manipulation ?? {}, prng);
+    const swap = index + roll.finalNumber;
     const left = pool[index]!;
     pool[index] = pool[swap]!;
     pool[swap] = left;
@@ -42,9 +44,10 @@ function drawUnique(prng: Prng, count: number, picks: number): number[] {
 function losingPicks(config: ShellConfig, winning: readonly number[], prng: Prng): number[] {
   if (config.variant === 'DOUBLE_BALL') {
     const empty = Array.from({ length: config.cups }, (_, index) => index).filter((cup) => !winning.includes(cup));
-    return [winning[prng.nextInt(0, winning.length - 1)]!, empty[prng.nextInt(0, empty.length - 1)]!];
+    const first = winning[rollNumber(0, winning.length - 1, config.manipulation ?? {}, prng).finalNumber]!;
+    return [first, empty[rollNumber(0, empty.length - 1, {}, prng).finalNumber]!];
   }
-  const offset = 1 + prng.nextInt(0, config.cups - 2);
+  const offset = 1 + rollNumber(0, config.cups - 2, {}, prng).finalNumber;
   return [(winning[0]! + offset) % config.cups];
 }
 
@@ -55,8 +58,9 @@ export function playShellRound(config: ShellConfig, prng: Prng, bet: VaCoinMicro
   const balls = config.variant === 'DOUBLE_BALL' ? 2 : 1;
   const multiplierBps = resolveShellMultiplierBps(config);
   const effectiveHitRate = effectiveShellHitRate(config);
-  const hit = prng.nextFloat() < effectiveHitRate;
-  const winning = drawUnique(prng, config.cups, balls);
+  const hitRoll = rollNumber(0, 9_999, {}, prng);
+  const hit = hitRoll.finalNumber < Math.round(effectiveHitRate * 10_000);
+  const winning = drawUnique(config, prng, balls);
   const picked = hit ? winning : losingPicks(config, winning, prng);
   const isNearMiss = !hit && picked.some((cup) => winning.includes(cup));
   const payout = hit ? mulVC(bet, multiplierBps) : ZERO_VC;

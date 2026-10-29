@@ -7,10 +7,11 @@
  *  PAYLINES   - Anzahl zusaetzlicher Gewinnlinien
  *  NEAR_MISS  - Wahrscheinlichkeit (0..1) fuer einen optischen Knapp-daneben
  *  HIT_RATE   - absolute Verschiebung der Trefferquote (-0.35..0.35), negativ = Hausvorteil
+ *  REELS      - zusaetzliche Slot-Rollen (0..3), Gesamtzahl bleibt bei 3..6
  */
 import type { VaCoinMicro } from '../economy/vacoin';
 
-export type ModTarget = 'WEIGHT' | 'PAYOUT' | 'PAYLINES' | 'NEAR_MISS' | 'HIT_RATE';
+export type ModTarget = 'WEIGHT' | 'PAYOUT' | 'PAYLINES' | 'NEAR_MISS' | 'HIT_RATE' | 'REELS';
 
 export interface ModContract {
   readonly id: string;
@@ -112,4 +113,13 @@ export function resolveExtraPaylines(modContracts: readonly ModContract[]): numb
     extra += Math.round(clamp(contract.value ?? contract.minBound, contract.minBound, contract.maxBound));
   }
   return Math.max(0, extra);
+}
+
+export function resolveExtraReels(modContracts: readonly ModContract[]): number {
+  let extra = 0;
+  for (const contract of modContracts) {
+    if (contract.target !== 'REELS') continue;
+    extra += Math.round(clamp(contract.value ?? contract.minBound, contract.minBound, contract.maxBound));
+  }
+  return Math.max(0, Math.min(3, extra));
 }

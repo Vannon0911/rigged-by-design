@@ -1,6 +1,7 @@
 /** Typen, Regeln und Basis-Mathematik des Hütchenspiels. */
 import type { VaCoinMicro } from '../../economy/vacoin';
 import { resolveHitRateShift, type ModContract } from '../../rng/bias-policy';
+import type { NumberManipulation } from '../../rng/number-rng';
 
 const BPS = 10_000;
 const BASE_MULTIPLIER_BPS = 28_000;
@@ -18,6 +19,8 @@ export interface ShellConfig {
   readonly variant: ShellVariant;
   /** Optionaler Auszahlungsfaktor; Standard waechst mit Bechern und Doppel-Kugel. */
   readonly multiplierBps?: number;
+  /** Zahlen-Pull auf die Becher-Indizes; wird pro Kugel angewendet. */
+  readonly manipulation?: NumberManipulation;
   readonly mods: readonly ModContract[];
 }
 

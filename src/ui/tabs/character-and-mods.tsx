@@ -123,6 +123,7 @@ export function CharacterAndMods({ profile, ownedMods, cash, revision, onBuy, on
 
           <div className="risk">
             <div className="risk-labels">
+              <span>Ruf {profile.reputation} · {profile.venue}</span>
               <span>Suspicion {profile.suspicion}/100</span>
               <span>Mods {equipped.length}/{MAX_EQUIPPED_PLAYER_MODS}</span>
             </div>

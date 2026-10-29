@@ -3,15 +3,11 @@ import type { LedgerEntry } from '../core/economy/ledger';
 import type { VaCoinMicro } from '../core/economy/vacoin';
 import type { PlacedItem } from '../core/simulation/casino-floor';
 import type { CpuCasinoId } from '../core/simulation/cpu-casinos';
-import type { JobId } from '../core/simulation/hustle-work';
+import type { CpuTableResult } from '../core/simulation/cpu-table-play';
+import type { FloorRoundEvent } from '../core/simulation/floor-events';
 import type { Visitor } from '../core/simulation/visitors';
 import type { SpinResult } from '../core/slot/slot-types';
-
-export interface JobState {
-  readonly ready: boolean;
-  readonly readyAt: number;
-  readonly cooldown: number;
-}
+import type { VenueTier } from '../core/progression/venues-and-tiers';
 
 export interface LastSpin {
   readonly casinoId: CpuCasinoId;
@@ -23,15 +19,22 @@ export interface LastSpin {
 export interface GameSnapshot {
   readonly cash: VaCoinMicro;
   readonly vault: VaCoinMicro;
+  readonly pendingPayouts: VaCoinMicro;
+  readonly hasGame: boolean;
+  readonly hasSlot: boolean;
+  readonly hasTable: boolean;
   readonly ledgerOk: boolean;
   readonly visitors: readonly Visitor[];
   readonly avgAddiction: number;
+  readonly floorSize: number;
+  readonly venueTier: VenueTier;
   readonly placements: readonly PlacedItem[];
+  readonly floorEvents: readonly FloorRoundEvent[];
   readonly lastEntries: readonly LedgerEntry[];
   readonly now: number;
-  readonly jobs: Readonly<Record<JobId, JobState>>;
   readonly casinoId: CpuCasinoId;
   readonly bet: VaCoinMicro;
   readonly lastSpin: LastSpin | null;
+  readonly lastTable: CpuTableResult | null;
   readonly notice: string;
 }

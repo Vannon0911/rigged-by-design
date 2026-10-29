@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { toVCString } from '../../core/economy/vacoin';
+import { resolvePaylines } from '../../core/slot/slot-engine';
 import { proveSlotMath, type SlotMathProof } from '../../core/slot/slot-evaluator';
 import type { SlotConfig } from '../../core/slot/slot-types';
 import {
@@ -99,7 +100,7 @@ export function RngProofPanel({ config, title, note, seed = LAB_SEED }: RngProof
           <h3>{title}</h3>
           <p className="lab-note">{note}</p>
         </div>
-        <span className="lab-footer">{config.paylines.length} Basis-Linien</span>
+        <span className="lab-footer">{resolvePaylines(config).length} Basis-Linien</span>
       </header>
 
       <div className="lab-toolbar">

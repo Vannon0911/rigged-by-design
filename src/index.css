@@ -2,12 +2,16 @@
 @import './styles/character.css';
 @import './styles/workshop.css';
 @import './styles/lab.css';
+@import './styles/studio.css';
 @import './styles/editor.css';
 @import './styles/shell.css';
 @import './styles/stage.css';
+@import './styles/window.css';
 @import './styles/tabs.css';
-@import './styles/jobs.css';
+@import './styles/economy.css';
 @import './styles/cpu-casinos.css';
 @import './styles/build.css';
 @import './styles/ticker.css';
+@import './styles/progression.css';
 @import './styles/responsive.css';
+@import './styles/rpg-shell.css';

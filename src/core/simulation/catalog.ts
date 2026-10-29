@@ -6,10 +6,13 @@ export type BuildableId =
   | 'SLOT_RUSTY'
   | 'DICE_TABLE'
   | 'SLOT_NEON'
+  | 'ROULETTE_TABLE'
+  | 'BLACKJACK_TABLE'
+  | 'POKER_TABLE'
   | 'DECO_CARPET'
   | 'DECO_NEON_SIGN'
   | 'DECO_BOOZE';
-export type BuildableKind = 'SLOT' | 'SHELL' | 'DICE' | 'DECO';
+export type BuildableKind = 'SLOT' | 'SHELL' | 'DICE' | 'ROULETTE' | 'BLACKJACK' | 'POKER' | 'DECO';
 
 export interface BuildableItem {
   readonly id: BuildableId;
@@ -73,6 +76,7 @@ export const BUILDABLES: readonly BuildableItem[] = [
     name: 'Hinterhof-Würfeltisch',
     priceVC: fromVC(28),
     description: 'Street Craps mit 2 Würfeln: Over/Under und Lucky 7. Die Brücke zum großen Casino.',
+    maxMods: 2,
     attractionBps: 900,
     minBetVC: fromVC(0.1),
     maxBetVC: fromVC(2),
@@ -89,6 +93,42 @@ export const BUILDABLES: readonly BuildableItem[] = [
     attractionBps: 1500,
     minBetVC: fromVC(0.1),
     maxBetVC: fromVC(0.5),
+  },
+  {
+    ...BASE,
+    id: 'ROULETTE_TABLE',
+    kind: 'ROULETTE',
+    name: 'Kessel-Tisch „Grüne Null“',
+    priceVC: fromVC(42),
+    description: 'Europäisches Roulette, 37 Pockets. Rot/Schwarz zahlt 1:1, Straight 35:1.',
+    maxMods: 2,
+    attractionBps: 1200,
+    minBetVC: fromVC(0.1),
+    maxBetVC: fromVC(2.5),
+  },
+  {
+    ...BASE,
+    id: 'BLACKJACK_TABLE',
+    kind: 'BLACKJACK',
+    name: 'Filz-Blackjack „17 steht“',
+    priceVC: fromVC(55),
+    description: '6 Decks, Dealer steht auf 17. Blackjack zahlt 3:2 - bis der Haus-Mod zuschlägt.',
+    maxMods: 2,
+    attractionBps: 1400,
+    minBetVC: fromVC(0.25),
+    maxBetVC: fromVC(5),
+  },
+  {
+    ...BASE,
+    id: 'POKER_TABLE',
+    kind: 'POKER',
+    name: 'Casino-Hold’em-Tisch',
+    priceVC: fromVC(80),
+    description: '5 Karten gegen den Dealer, Ante-Bonus bis Royal Flush. Das Prestige-Objekt.',
+    maxMods: 2,
+    attractionBps: 1600,
+    minBetVC: fromVC(0.5),
+    maxBetVC: fromVC(8),
   },
   {
     ...BASE,
@@ -129,6 +169,8 @@ export function getBuildable(id: BuildableId): BuildableItem {
 export {
   OPERATOR_MODS,
   getOperatorMod,
+  operatorModsFor,
   type OperatorMod,
   type OperatorModId,
+  type OperatorTarget,
 } from './operator-mods';

@@ -153,9 +153,25 @@
 }
 
 .visitor-wallet {
+  display: grid;
+  gap: 1px;
   font-size: 11px;
   color: var(--gold);
   white-space: nowrap;
+}
+
+.visitor-net {
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 0.02em;
+}
+
+.visitor-net.win {
+  color: #ff6b81;
+}
+
+.visitor-net.loss {
+  color: #4ade80;
 }
 
 .visitor-addiction {

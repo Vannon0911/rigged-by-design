@@ -5,6 +5,7 @@ const VAULT_STEP = fromVC(1);
 export interface TopBarProps {
   readonly cash: VaCoinMicro;
   readonly vault: VaCoinMicro;
+  readonly pending: VaCoinMicro;
   readonly visitors: number;
   readonly avgAddiction: number;
   readonly ledgerOk: boolean;
@@ -16,6 +17,7 @@ export interface TopBarProps {
 export function TopBar({
   cash,
   vault,
+  pending,
   visitors,
   avgAddiction,
   ledgerOk,
@@ -50,6 +52,11 @@ export function TopBar({
               -1 VC
             </button>
           </div>
+        </div>
+
+        <div className="stat pending">
+          <span>Offene Gewinne</span>
+          <strong>{toVCString(pending)}</strong>
         </div>
 
         <div className="stat guests">

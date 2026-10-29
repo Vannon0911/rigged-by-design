@@ -1,10 +1,9 @@
-/** Spielstand v1: Ledger-Log, Floor, Jobs und PRNG-Zustand in localStorage. */
+/** Spielstand v1: Ledger-Log, Floor und PRNG-Zustand in localStorage. */
 import { ACCOUNTS, Ledger, type AccountId } from '../core/economy/ledger';
 import type { VaCoinMicro } from '../core/economy/vacoin';
 import type { CasinoFloor } from '../core/simulation/casino-floor';
 import type { FloorSnapshot } from '../core/simulation/casino-floor';
 import type { CpuCasinoId } from '../core/simulation/cpu-casinos';
-import type { HustleWork, HustleSnapshot } from '../core/simulation/hustle-work';
 
 const SAVE_KEY = 'vcoin.game.v1';
 const ACCOUNT_IDS: ReadonlySet<string> = new Set(ACCOUNTS);
@@ -33,7 +32,6 @@ export interface GameSave {
   readonly version: 1;
   readonly ledger: readonly SavedTransfer[];
   readonly floor: FloorSnapshot;
-  readonly hustle: HustleSnapshot;
   readonly clock: number;
   readonly tick: number;
   readonly casinoId: CpuCasinoId;
@@ -49,7 +47,6 @@ export function loadGameSave(): GameSave | null {
     const parsed = JSON.parse(raw) as Partial<GameSave>;
     if (parsed.version !== 1 || !Array.isArray(parsed.ledger) || !parsed.ledger.every(isSavedTransfer)) return null;
     if (!parsed.floor || !Array.isArray(parsed.floor.items) || !Array.isArray(parsed.floor.visitors)) return null;
-    if (!parsed.hustle || typeof parsed.hustle !== 'object') return null;
     if (!Number.isSafeInteger(parsed.clock) || !Number.isSafeInteger(parsed.tick)) return null;
     if (!Number.isSafeInteger(parsed.bet) || !Number.isSafeInteger(parsed.prngState)) return null;
     if (typeof parsed.casinoId !== 'string') return null;
@@ -71,7 +68,6 @@ export function saveGameSave(save: GameSave): void {
 export interface GameStateSave {
   readonly ledger: Ledger;
   readonly floor: CasinoFloor;
-  readonly hustle: HustleWork;
   readonly clock: number;
   readonly tick: number;
   readonly casinoId: CpuCasinoId;
@@ -84,7 +80,6 @@ export function saveGameState(input: GameStateSave): void {
     version: 1,
     ledger: input.ledger.entries.map(({ tick, from, to, amount, reason }) => ({ tick, from, to, amount, reason })),
     floor: input.floor.snapshot(),
-    hustle: input.hustle.snapshot(),
     clock: input.clock,
     tick: input.tick,
     casinoId: input.casinoId,

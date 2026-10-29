@@ -6,6 +6,7 @@
  *  CASINO_VAULT     - eigenes Deckungskapital des Casinos
  *  CPU_CASINO_POOL  - Pool des CPU-Gegencasinos
  *  VISITOR_WALLET   - gepooltes Bargeld der Besucher auf dem Floor
+ *  PENDING_PAYOUT   - reservierte Gewinne, die der Spieler noch auszahlen muss
  *  EXTERNAL_WORK    - Aussenwelt: einzige Quelle/Senke fuer neues Geld (darf negativ sein)
  *  SHOP_VENDOR      - Shop-/Vendor-Konto
  *
@@ -19,6 +20,7 @@ export const ACCOUNTS = [
   'CASINO_VAULT',
   'CPU_CASINO_POOL',
   'VISITOR_WALLET',
+  'PENDING_PAYOUT',
   'EXTERNAL_WORK',
   'SHOP_VENDOR',
 ] as const;

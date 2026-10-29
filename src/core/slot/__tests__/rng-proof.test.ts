@@ -4,7 +4,7 @@ import { applyWeightBias, type ModContract } from '../../rng/bias-policy';
 import { Prng } from '../../rng/prng';
 import { getTheoreticalProbabilities } from '../../rng/weighted-pool';
 import { proveSlotMath } from '../slot-evaluator';
-import { spinSlot } from '../slot-engine';
+import { resolveReels, spinSlot } from '../slot-engine';
 import { DEFAULT_SLOT_CONFIG, type SlotConfig } from '../slot-types';
 
 const CLASSIC: SlotConfig = {
@@ -73,7 +73,7 @@ describe('RNG- und Slot-Beweise', () => {
 
   it('Symbolverteilung weicht nach 20.000 Spins um weniger als 1.5 Prozentpunkte ab', () => {
     const proof = proveSlotMath(CLASSIC, 20_000, 42);
-    expect(proof.symbolDistribution).toHaveLength(5);
+    expect(proof.symbolDistribution).toHaveLength(6);
     const theoreticalTotal = proof.symbolDistribution.reduce((sum, entry) => sum + entry.theoreticalPct, 0);
     expect(theoreticalTotal).toBeCloseTo(100, 10);
     for (const entry of proof.symbolDistribution) {
@@ -105,6 +105,25 @@ describe('RNG- und Slot-Beweise', () => {
       }
     }
     expect(nearMisses).toBeGreaterThan(0);
+  });
+
+  it('REELS-Mod erweitert den Baukasten auf bis zu sechs Rollen', () => {
+    const config: SlotConfig = {
+      ...DEFAULT_SLOT_CONFIG,
+      id: 'six-reel-test',
+      mods: [{
+        id: 'MOD_EXTRA_REEL',
+        name: 'Rollenausbau',
+        target: 'REELS',
+        minBound: 0,
+        maxBound: 3,
+        costVC: fromVC(45),
+        description: 'Test',
+        value: 3,
+      }],
+    };
+    expect(resolveReels(config)).toHaveLength(6);
+    expect(resolveReels({ ...config, mods: [] })).toHaveLength(3);
   });
 
   it('Weight-Bias wird hart auf die Vertragsgrenzen geklemmt und normalisiert', () => {

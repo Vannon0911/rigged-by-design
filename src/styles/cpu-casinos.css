@@ -171,3 +171,65 @@
   color: #ffc2cd;
 }
 
+
+/* ---------- CPU Tische & Kartenspiele ---------- */
+.table-launcher {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.table-launch-card {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #122a1e, #0b111f);
+  color: var(--text);
+  font: inherit;
+  padding: 10px;
+  cursor: pointer;
+}
+
+.table-launch-card strong {
+  font-size: 11px;
+  color: #ffd166;
+}
+
+.table-launch-card span {
+  font-size: 9px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.table-launch-card:hover:not(:disabled) {
+  border-color: #00ffcc;
+  box-shadow: 0 0 18px rgba(0, 255, 204, 0.12);
+}
+
+.table-launch-card:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.card-table-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.table-switch.active {
+  border-color: #ffd166;
+  color: #ffd166;
+  background: #241d0d;
+}
+
+.roulette-bets {
+  gap: 5px;
+}
+
+@media (max-width: 620px) {
+  .table-launcher {
+    grid-template-columns: 1fr;
+  }
+}

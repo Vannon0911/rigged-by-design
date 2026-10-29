@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import type { VaCoinMicro } from '../../core/economy/vacoin';
+import { useProgressionStore } from '../../store/progression-store';
 import { useWorkshopStore, workshopStore } from '../../store/workshop-store';
 import { CPU_LAB_SLOTS } from './lab-model';
 import { RngProofPanel } from './rng-proof-panel';
-import { SlotEditorPanel } from './slot-editor-panel';
+import { SlotBuilderStudio } from './slot-builder-studio';
+import { TableGameModder } from './table-game-modder';
 
 export interface WorkshopPageProps {
   readonly cash: VaCoinMicro;
@@ -12,6 +14,7 @@ export interface WorkshopPageProps {
 export function WorkshopPage({ cash }: WorkshopPageProps) {
   const [target, setTarget] = useState('OWN');
   const workshop = useWorkshopStore();
+  const progression = useProgressionStore();
   const cpu = CPU_LAB_SLOTS.find((slot) => slot.id === target);
   const isOwn = target === 'OWN';
   const config = isOwn ? workshop.ownSlot : cpu?.config ?? CPU_LAB_SLOTS[0]!.config;
@@ -24,7 +27,7 @@ export function WorkshopPage({ cash }: WorkshopPageProps) {
   return (
     <section className="workshop">
       <header className="panel-head">
-        <h2>RNG-Beweis-Labor &amp; Slot-Werkstatt</h2>
+        <h2>RNG-Beweis-Labor &amp; Sucht-Werkstatt</h2>
         <span className="hint">Soll vs. Ist auf echten Spins</span>
       </header>
 
@@ -47,7 +50,7 @@ export function WorkshopPage({ cash }: WorkshopPageProps) {
       <RngProofPanel key={config.id} config={config} title={title} note={note} />
 
       {isOwn && (
-        <SlotEditorPanel
+        <SlotBuilderStudio
           config={workshop.ownSlot}
           cash={cash}
           ownedMods={workshop.ownedMods}
@@ -56,6 +59,8 @@ export function WorkshopPage({ cash }: WorkshopPageProps) {
           onToggleMod={workshopStore.toggle}
         />
       )}
+
+      <TableGameModder venueTier={progression.venue.tier} />
 
       <p className="hint">{workshop.notice}</p>
     </section>

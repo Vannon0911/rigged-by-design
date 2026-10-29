@@ -30,6 +30,7 @@ export const SYMBOL_LABELS = {
   BELL: 'Glocke',
   SEVEN: 'Sieben',
   VACOIN_DIAMOND: 'Diamant',
+  WILD: 'Wild-Multiplikator',
 } as const;
 
 export interface DeterminismReport {

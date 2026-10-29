@@ -2,6 +2,7 @@
 import type { VaCoinMicro } from '../../economy/vacoin';
 import type { ModContract } from '../../rng/bias-policy';
 import type { WeightedEntry } from '../../rng/weighted-pool';
+import type { NumberManipulation } from '../../rng/number-rng';
 
 export const DICE_FACES = [1, 2, 3, 4, 5, 6] as const;
 export type DiceFace = (typeof DICE_FACES)[number];
@@ -18,6 +19,8 @@ export interface DiceConfig {
   readonly side?: DiceSide;
   readonly threshold?: number;
   readonly weights?: Readonly<Partial<Record<DiceFace, number>>>;
+  /** Zahlen-Pull auf die gewichtete Wuerfel-Sequenz. */
+  readonly manipulation?: NumberManipulation;
   readonly mods: readonly ModContract[];
   readonly devilDie?: boolean;
   /** Fester Auszahlungsfaktor; sonst aus fairen Gewinnchancen auf ~92 % RTP berechnet. */

@@ -19,16 +19,16 @@
 
 Ein Browser-Casino-Roguelite über die Karriere eines Menschen, der mit einem Pappkarton und drei Bechern anfängt und damit endet, anderen Menschen einen Pappkarton mit drei Bechern zu verkaufen. Dazwischen: Slots, Würfel, Near Misses, ein Ledger, das nicht lügt, und ein RNG, das sich innerhalb definierter Grenzen bestechen lässt.
 
-Du startest mit **5,0000 VC**. Kein Kredit, keine Investoren, keine Gnade. Du kannst Pfand sammeln, Türsteher spielen oder sofort im CPU-Casino beweisen, dass Optimismus keine Anlagestrategie ist.
+Du startest mit **0,0000 VC**. Kein Kredit, keine Investoren, keine Gnade. Der erste Job ist Pfand sammeln, nicht „ich fühle einen Jackpot“. Das CPU-Slot-Fenster öffnet erst, wenn auf deinem Floor ein Spielautomat steht; die Tische öffnen mit Hütchenspiel-Karton oder Würfeltisch. Vorher gibt es nichts zu spielen.
 
 Der zweite Teil ist wichtiger: Du baust dein eigenes Casino. Acht mal acht Felder, ein paar Automaten, ein roter Teppich, ein Neon-Schild. Besucher kommen, spielen, verlieren, bleiben. **Du** wirst die Bank. Das ist pädagogisch wertvoll, solange man nicht darüber nachdenkt, was es über einen sagt.
 
 ## Die Schleife
 
-1. **Arbeiten gehen.** Pfand und Flyer sammeln oder eine Türsteher-Schicht schieben. Klingt erniedrigend, ist aber der einzige Weg aus dem Startloch.
-2. **In fremden CPU-Casinos zocken.** Rostige Spelunke für den Ziel-RTP von 94 %, Syndikat-Lounge für den Ziel-RTP von 58 % und den Satz „diesmal ist es anders“.
+1. **Arbeiten gehen.** Pfand und Flyer sammeln oder eine Türsteher-Schicht schieben. Klingt erniedrigend, ist aber der einzige Weg aus dem Startloch. Bei 0 VC ist der erste Klick kein Spin, sondern ein Job.
+2. **Erst bauen, dann zocken.** Ein eigener Spielautomat schaltet das CPU-Slot-Fenster frei, ein Hütchenspiel-Karton oder Würfeltisch die Tische. Dann: Rostige Spelunke für den Ziel-RTP von 94 %, Syndikat-Lounge für den Ziel-RTP von 58 % und den Satz „diesmal ist es anders“.
 3. **Eigenes Casino bauen.** Hütchenspieler-Karton, rostiger Slot, Würfeltisch, Neon-Kabinett, Teppich, Reklameschild, Fusel-Spender. Alles mit festen Preisen und ohne Finanzierungsrunde.
-4. **Besucher empfangen.** Sie haben eine Brieftasche, Geduld und eine Sucht-Leiste. Du hast einen Tresor und Betriebskosten. Rate, wer länger durchhält.
+4. **Besucher empfangen und auszahlen.** Sie haben eine Brieftasche, Geduld und eine Sucht-Leiste. Du hast einen Tresor und Betriebskosten. Gewinne werden als `PENDING_PAYOUT` reserviert; erst wenn du sie manuell auszahlst, darf der Gast weiterzocken. Rate, wer länger durchhält.
 5. **Im RNG-Labor nachrechnen.** Soll vs. Ist, Trefferquote, LDW-Quote, Near-Miss-Quote, gemessener RTP, Hausvorteil, Sucht-Score. Damit du weißt, ob dein Automat ein Produkt oder ein Beweisstück ist.
 6. **Dich selbst ausrüsten.** Fünf Player-Mods, ein sichtbarer Paper-Doll und ein Suspicion-Wert, der irgendwann den Türsteher ruft.
 
@@ -42,10 +42,10 @@ Der Fortschritt ist ein Kreislauf aus „ich brauche mehr Kapital“ und „ich 
 | **Slots** | 3×3-Raster, 1–3 Paylines, fünf Symbole, Near-Miss-Inszentierung, LDW-Erkennung und installierbare Betreiber-Mods. |
 | **Hütchenspiel** | 3–5 Becher, Einzel- oder Doppelkugel, Magnet-Bias, Heat-Wert und exakte RTP-Auswertung. |
 | **Würfel** | 2–4 W6, Over/Under, Lucky 7, Pasch-Jagd, gewichtete Seiten und optionaler Teufelswürfel. |
-| **Wirtschaft** | VaCoins als Micro-Units, sechs Ledger-Konten inklusive `VISITOR_WALLET`, keine negativen Salden, doppelte Buchführung und Integritätsprüfung. |
-| **Eigenes Casino** | 8×8-Grid, Slots, Hütchenspiel, Würfeltisch, Deko, Besucher-Simulation, Geduld, Sucht und Bankrott. |
+| **Wirtschaft** | VaCoins als Micro-Units, sieben Ledger-Konten inklusive `VISITOR_WALLET` und `PENDING_PAYOUT`, keine negativen Salden, doppelte Buchführung und Integritätsprüfung. |
+| **Eigenes Casino** | 8×8-Grid, Slots, Hütchenspiel, Würfeltisch, Deko, Besucher-Simulation, Geduld, Sucht und Bankrott. Jeder Gast-Spin erscheint als symbolisches Popup mit Cash-Tick; die Gesamtbilanz steht als rot/grünes `Σ` am Gast. |
 | **Charakter** | Prozeduraler PixiJS-Paper-Doll, fünf Player-Mods, Ausrüstung, Suspicion und Rauswurf mit Ledger-Buchung. |
-| **Bühne** | Komplett prozedurale PixiJS-Grafik: Slot-Maschine, 8×8-Floor, Hütchenspiel- und Würfeltisch. Keine externen Bild-URLs. |
+| **Bühne** | Der 8×8-Floor ist die Hauptfläche; Slot, Hütchenspiel und Craps öffnen als eigene Fenster. Komplett prozedurale PixiJS-Grafik, keine externen Bild-URLs. |
 | **Beweislabor** | 1.000 oder 10.000 Spins, Soll-/Ist-Balken pro Symbol, RTP-/Sucht-Kennzahlen und Seed-Reproduzierbarkeits-Check. |
 | **Persistenz** | Automatischer Spielstand in `localStorage`, inklusive Ledger-Replay und Wiederherstellung des RNG-Zustands. |
 
@@ -72,14 +72,14 @@ Das sind LOC-Guillotine, Typecheck, Tests und Production-Build. Ja, alle vier. N
 
 | Tab | Was du dort machst |
 | --- | --- |
-| **1. Arbeiten & CPU-Casinos** | Jobs mit Cooldown, Casino wählen, Einsatz setzen, spinnen, Auto-Spin einschalten und danach bereuen. |
-| **2. Eigenes Casino & Baumarkt** | Objekte kaufen und auf dem 8×8-Grid platzieren, Gäste mit Wallet, Sucht und Zustand beobachten. |
+| **1. Arbeiten & CPU-Casinos** | Jobs mit Cooldown, Casino wählen, Einsatz setzen und das Slot-Fenster öffnen. Ohne gebautes Spiel bleibt der Spin gesperrt. |
+| **2. Eigenes Casino & Baumarkt** | Objekte kaufen und auf dem 8×8-Grid platzieren, Gäste mit Wallet, Sucht und Zustand beobachten und offene Gewinne manuell auszahlen. |
 | **3. RNG-Labor & Werkstatt** | Eigene Slots tunen, Betreiber-Mods kaufen und die Mathematik mit 1.000 oder 10.000 Spins live prüfen. |
 | **4. Charakter & Mods** | Aussehen ändern, Player-Mods kaufen und ausrüsten, Suspicion-Risiko und Luck-Bonus vergleichen. |
 
-Über der PixiJS-Bühne kannst du zwischen **Slot-Maschine**, **Casino-Floor** und den **Tischen** (Hütchenspiel/Street Craps) umschalten. Im Charakter-Tab übernimmt das Charakter-Labor die Bühne; zwei PixiJS-Apps auf demselben Host wären nur ein teurer Weg, einen Canvas-Fehler zu produzieren.
+Der **Casino-Floor** ist die Hauptbühne und bleibt sichtbar. **CPU-Slot**, **Hütchenspiel** und **Street Craps** öffnen sich als eigene Fenster und schließen sich wieder; der Floor läuft dahinter weiter. Das Slot-Fenster ist gesperrt, bis ein eigener Spielautomat steht. Die Tisch-Fenster brauchen einen Hütchenspiel-Karton oder Würfeltisch.
 
-Der Spielstand wird nach Aktionen und mit jedem Simulations-Tick automatisch gespeichert. Er liegt lokal im Browser. Kein Account, kein Cloud-Sync, keine Ausrede: Wer die Browserdaten löscht, startet wieder mit 5,0000 VC.
+Der Spielstand wird nach Aktionen und mit jedem Simulations-Tick automatisch gespeichert. Er liegt lokal im Browser. Kein Account, kein Cloud-Sync, keine Ausrede: Wer die Browserdaten löscht, startet wieder mit 0,0000 VC und muss erneut Pfand sammeln.
 
 ## Architektur
 
@@ -100,7 +100,7 @@ Die Regeln sind nicht dekorativ:
 1. **200 LOC pro `.ts`/`.tsx`-Datei.** Komplexe Renderer dürfen 350 LOC haben, aber nur mit einem begründeten `// @loc-exception:`-Header in Zeile 1. Der Guard heißt `scripts/check-loc.mjs` und beendet sich mit Exit-Code 1, wenn jemand kreativ wird.
 2. **`src/core/` ist headless.** Kein React, kein PixiJS, kein DOM. Die Wirtschaft und die Spiele müssen auch ohne Browser beweisbar sein.
 3. **Geld ist ganzzahlig.** `1,0000 VC = 10.000` Micro-Units. Keine Floats, keine `0.1 + 0.2`-Überraschungen, keine Ausreden über Gleitkomma.
-4. **Jede Buchung läuft über das Ledger.** Auch Besucher-Wallets liegen als gepooltes `VISITOR_WALLET` im Ledger; beim Spawn, Einsatz, Gewinn und Verlassen des Casinos wird gebucht. Konten dürfen nicht ohne Deckung ins Minus. Die Summe aller Bewegungen muss exakt null ergeben. Geld wird nicht gedruckt, außer durch `EXTERNAL_WORK` – und das ist ein Job, kein Gelddruck.
+4. **Jede Buchung läuft über das Ledger.** Besucher-Wallets liegen als gepooltes `VISITOR_WALLET` im Ledger, Gewinne warten als `PENDING_PAYOUT` auf deine Auszahlung. Beim Spawn, Einsatz, Gewinn, Auszahlen und Verlassen des Casinos wird gebucht. Konten dürfen nicht ohne Deckung ins Minus. Die Summe aller Bewegungen muss exakt null ergeben. Geld wird nicht gedruckt, außer durch `EXTERNAL_WORK` – und das ist ein Job, kein Gelddruck.
 
 ## Mathematik, kurz und ehrlich
 

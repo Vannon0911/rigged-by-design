@@ -2,20 +2,22 @@
 import type { Ledger, LedgerEntry } from '../economy/ledger';
 import { fromVC, mulVC, type VaCoinMicro } from '../economy/vacoin';
 import type { Prng } from '../rng/prng';
-import { spinSlot } from '../slot/slot-engine';
+import { resolvePaylines, spinSlot } from '../slot/slot-engine';
 import { BASE_WEIGHTS, type SlotConfig, type SlotSymbol, type SpinResult } from '../slot/slot-types';
+import { CPU_TABLE_OFFERS, type CpuTableOffer } from './cpu-tables';
 
-export type CpuCasinoId = 'CPU_DIVE_BAR' | 'CPU_HIGH_ROLLER';
+export type CpuCasinoId = 'CPU_DIVE_BAR' | 'CPU_BACKROOM_CLUB' | 'CPU_NEON_SPIRE' | 'CPU_HIGH_ROLLER';
 
 export interface CpuCasino {
   readonly id: CpuCasinoId;
+  readonly venueTier: 1 | 2 | 3 | 4;
   readonly name: string;
   readonly description: string;
-  readonly unlockBalanceVC: VaCoinMicro;
   readonly minBetVC: VaCoinMicro;
   readonly maxBetVC: VaCoinMicro;
   readonly targetRtp: number;
   readonly slot: SlotConfig;
+  readonly tables: readonly CpuTableOffer[];
 }
 
 /** Nur Spieler-Boni: werden nie an Besucher im eigenen Casino angewendet. */
@@ -31,12 +33,13 @@ const HIGH_VOL_WEIGHTS = { BLANK: 25, CHERRY: 20, BELL: 20, SEVEN: 20, VACOIN_DI
 export const CPU_CASINOS: readonly CpuCasino[] = [
   {
     id: 'CPU_DIVE_BAR',
-    name: 'Rostige Spelunke',
-    description: 'Faire Gewichte, ~94 % RTP, Einsaetze von 0.1000 bis 1.0000 VC pro Linie.',
-    unlockBalanceVC: fromVC(0),
+    venueTier: 1,
+    name: 'Straßen-Spelunke',
+    description: 'Standard-CPU-Casino: faire Gewichte, ~94 % RTP, Einsaetze ab 0.1000 VC.',
     minBetVC: fromVC(0.1),
     maxBetVC: fromVC(1),
     targetRtp: 0.94,
+    tables: CPU_TABLE_OFFERS.CPU_DIVE_BAR,
     slot: {
       id: 'cpu-dive-bar',
       baseBet: fromVC(0.1),
@@ -46,13 +49,48 @@ export const CPU_CASINOS: readonly CpuCasino[] = [
     },
   },
   {
+    id: 'CPU_BACKROOM_CLUB',
+    venueTier: 2,
+    name: 'Hinterhof-Club',
+    description: 'Mittelklasse: mehr Filz, mehr Neon, ~90 % RTP. Ab eigener Stufe 2.',
+    minBetVC: fromVC(0.25),
+    maxBetVC: fromVC(2.5),
+    targetRtp: 0.9,
+    tables: CPU_TABLE_OFFERS.CPU_BACKROOM_CLUB,
+    slot: {
+      id: 'cpu-backroom-club',
+      baseBet: fromVC(0.25),
+      paylines: ['MIDDLE', 'TOP', 'BOTTOM'],
+      mods: [],
+      weights: { BLANK: 22, CHERRY: 22, BELL: 21, SEVEN: 20, VACOIN_DIAMOND: 15 },
+    },
+  },
+  {
+    id: 'CPU_NEON_SPIRE',
+    venueTier: 3,
+    name: 'Neon-Spire',
+    description: 'High-Roller: drei Linien, hohe Volatilitaet, ~85 % RTP. Ab eigener Stufe 3.',
+    minBetVC: fromVC(0.5),
+    maxBetVC: fromVC(5),
+    targetRtp: 0.85,
+    tables: CPU_TABLE_OFFERS.CPU_NEON_SPIRE,
+    slot: {
+      id: 'cpu-neon-spire',
+      baseBet: fromVC(0.5),
+      paylines: ['MIDDLE', 'TOP', 'BOTTOM'],
+      mods: [],
+      weights: { BLANK: 26, CHERRY: 22, BELL: 20, SEVEN: 19, VACOIN_DIAMOND: 13 },
+    },
+  },
+  {
     id: 'CPU_HIGH_ROLLER',
-    name: 'Syndikat-Lounge',
-    description: 'Ab 10.0000 VC Besitz, hohe Volatilitaet, Jackpot bis 50x, 1.0000 bis 10.0000 VC.',
-    unlockBalanceVC: fromVC(10),
+    venueTier: 4,
+    name: 'Mogul-Lounge',
+    description: 'VIP-Mogul: hohe Volatilitaet, Jackpot bis 50x, 1.0000 bis 10.0000 VC. Ab Stufe 4.',
     minBetVC: fromVC(1),
     maxBetVC: fromVC(10),
     targetRtp: 0.58,
+    tables: CPU_TABLE_OFFERS.CPU_HIGH_ROLLER,
     slot: {
       id: 'cpu-high-roller',
       baseBet: fromVC(1),
@@ -95,11 +133,7 @@ export function playCpuCasinoSpin(
   if (betPerLine < casino.minBetVC || betPerLine > casino.maxBetVC) {
     throw new Error(`${casino.name}: Einsatz ${betPerLine} ausserhalb ${casino.minBetVC}..${casino.maxBetVC}`);
   }
-  if (ledger.getBalance('PLAYER_CASH') < casino.unlockBalanceVC) {
-    throw new Error(`${casino.name} ist erst ab ${casino.unlockBalanceVC} Mikro-VC freigeschaltet`);
-  }
-
-  const lines = casino.slot.paylines.length;
+  const lines = resolvePaylines(casino.slot).length;
   const totalBet = (betPerLine * lines) as VaCoinMicro;
   if (!Number.isSafeInteger(totalBet)) throw new Error('playCpuCasinoSpin: Gesamteinsatz zu gross');
 

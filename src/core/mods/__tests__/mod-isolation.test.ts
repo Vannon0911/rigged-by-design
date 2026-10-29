@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BOUNCER_PENALTY_BPS, CPU_CASINO_LOCKOUT_SECONDS } from '../../character/bouncer';
+import { reputationForBuild } from '../../character/appearance';
 import { MAX_EQUIPPED_PLAYER_MODS, PlayerProfile } from '../../character/player-profile';
 import { Ledger } from '../../economy/ledger';
 import { BPS_DENOMINATOR, fromVC, toVCString, type VaCoinMicro } from '../../economy/vacoin';
@@ -114,6 +115,15 @@ describe('Player-Mod-Isolation', () => {
     expect(profile.isLockedOut(tick + CPU_CASINO_LOCKOUT_SECONDS)).toBe(false);
     expect(() => profile.registerModUse('PMOD_LOADED_DICE', ledger, tick + 1)).toThrow(/gesperrt/);
     expect(BOUNCER_PENALTY_BPS).toBe(1500);
+  });
+
+  it('Ausbau-Reputation schaltet groessere Standorte frei', () => {
+    const profile = new PlayerProfile();
+    profile.addReputation(reputationForBuild(fromVC(15)));
+    expect(profile.reputation).toBe(150);
+    expect(profile.venue).toBe('BACKROOM');
+    profile.addReputation(100);
+    expect(profile.venue).toBe('CLUB');
   });
 
   it('respektiert das Limit von vier gleichzeitig ausgeruesteten Mods', () => {

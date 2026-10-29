@@ -1,19 +1,34 @@
 import { describe, expect, it } from 'vitest';
 import { Ledger } from '../../economy/ledger';
-import { fromVC, type VaCoinMicro } from '../../economy/vacoin';
+import { addVC, fromVC, subVC, ZERO_VC } from '../../economy/vacoin';
 import { Prng } from '../../rng/prng';
 import { CasinoFloor } from '../casino-floor';
 import { getBuildable } from '../catalog';
 import { playCpuCasinoSpin } from '../cpu-casinos';
-import { HustleWork } from '../hustle-work';
+import { canEnterCpuCasino, canUpgradeVenue, growthFrom, upgradeBlockers } from '../progression';
+import type { Visitor } from '../visitors';
 
-describe('Simulations-Loop', () => {
+function guest(wallet: number, addiction: number, patience = 100): Visitor {
+  return {
+    id: 1,
+    name: 'Testgast 1',
+    outfitTier: 0,
+    buyIn: fromVC(wallet),
+    wallet: fromVC(wallet),
+    pendingPayout: ZERO_VC,
+    addiction,
+    patience,
+    spins: 0,
+  };
+}
+
+describe('Simulations-Loop ohne künstliche Arbeit', () => {
   it('Katalogpreise und Grid-Regeln stimmen', () => {
+    expect(getBuildable('SHELL_CART').priceVC).toBe(fromVC(5));
     expect(getBuildable('SLOT_RUSTY').priceVC).toBe(fromVC(15));
     expect(getBuildable('SLOT_RUSTY').maxMods).toBe(2);
     expect(getBuildable('SLOT_NEON').paylines).toBe(3);
     expect(getBuildable('DECO_BOOZE').operatingCostVC).toBe(fromVC(0.05));
-    expect(getBuildable('DECO_NEON_SIGN').spawnBonusBps).toBe(2500);
 
     const ledger = new Ledger({ PLAYER_CASH: fromVC(100), CASINO_VAULT: fromVC(100) });
     const floor = new CasinoFloor(ledger, new Prng(7));
@@ -22,108 +37,124 @@ describe('Simulations-Loop', () => {
     expect(() => floor.placeItem('SLOT_NEON', 0, 0)).toThrow(/belegt/);
   });
 
-  it('Arbeiten -> CPU-Casino verdoppeln -> Slot kaufen -> Besucher zocken lassen', () => {
-    const ledger = new Ledger({
-      CPU_CASINO_POOL: fromVC(500),
-      CASINO_VAULT: fromVC(200),
-    });
-    const prng = new Prng(20261029);
-    const hustle = new HustleWork(ledger, prng);
-    let now = 0;
+  it('startet mit 5 VC und einem kostenlosen Hütchenspieler-Karton, der echte Einnahmen erzeugt', () => {
+    const ledger = new Ledger({ PLAYER_CASH: fromVC(5) });
+    const floor = new CasinoFloor(ledger, new Prng(20261029), { venueTier: 1, enforceVenue: true });
+    const starter = floor.ensureStarterGame();
 
-    // 1) Arbeiten, bis 25 VC in der Tasche sind.
-    while (ledger.getBalance('PLAYER_CASH') < fromVC(25)) {
-      hustle.work('BOTTLE_COLLECT', now);
-      now += 1.5;
-    }
-    expect(() => hustle.work('BOTTLE_COLLECT', now - 1)).toThrow(/Cooldown/);
-    const afterWork = ledger.getBalance('PLAYER_CASH');
-    expect(afterWork).toBeGreaterThanOrEqual(fromVC(25));
+    expect(starter?.buildableId).toBe('SHELL_CART');
+    expect(floor.games).toHaveLength(1);
+    expect(ledger.getBalance('PLAYER_CASH')).toBe(fromVC(5));
+    expect(floor.ensureStarterGame()).toBeNull();
 
-    // 2) Im CPU-Casino verdoppeln (bei Ebbe wird wieder gearbeitet).
-    const target = (afterWork * 2) as VaCoinMicro;
-    let cpuSpins = 0;
-    let cpuWins = 0;
-    let guard = 0;
-    while (ledger.getBalance('PLAYER_CASH') < target && guard < 5_000) {
-      guard += 1;
-      if (ledger.getBalance('PLAYER_CASH') < fromVC(3)) {
-        hustle.work('BOTTLE_COLLECT', now);
-        now += 1.5;
-        continue;
-      }
-      const spin = playCpuCasinoSpin('CPU_DIVE_BAR', fromVC(1), ledger, prng, Math.floor(now));
-      cpuSpins += 1;
-      if (spin.payout > 0) cpuWins += 1;
-      now += 1;
-    }
-    expect(cpuSpins).toBeGreaterThan(0);
-    expect(cpuWins).toBeGreaterThan(0);
-    expect(ledger.getBalance('PLAYER_CASH')).toBeGreaterThanOrEqual(target);
-
-    // 3) Eigenen Slot kaufen und einen Sucht-Mod installieren.
-    const floor = new CasinoFloor(ledger, prng);
-    const slot = floor.placeItem('SLOT_RUSTY', 2, 3);
-    floor.installMod(slot.id, 'MOD_NEAR_MISS');
-    expect(floor.slots).toHaveLength(1);
-    expect(() => floor.installMod(slot.id, 'MOD_NEAR_MISS')).toThrow(/bereits installiert/);
-
-    // 4) Besucher simulieren und Tresor-Bilanz pruefen.
     const vaultBefore = ledger.getBalance('CASINO_VAULT');
-    let simulatedSpins = 0;
-    let bets = 0;
-    let payouts = 0;
-    let maxVisitors = 0;
-    for (let tick = 0; tick < 400; tick += 1) {
-      const result = floor.tickCasinoFloor();
-      simulatedSpins += result.spins;
-      bets += result.bets;
-      payouts += result.payouts;
-      maxVisitors = Math.max(maxVisitors, floor.visitors.length);
-    }
-    expect(maxVisitors).toBeGreaterThan(0);
-    expect(simulatedSpins).toBeGreaterThan(0);
-    expect(floor.tickCount).toBe(400);
-    expect(ledger.getBalance('CASINO_VAULT')).toBe(vaultBefore + bets - payouts);
-    expect(ledger.verifyLedgerIntegrity()).toBe(true);
-    const walletTotal = floor.visitors.reduce((sum, visitor) => sum + visitor.wallet, 0);
-    expect(ledger.getBalance('VISITOR_WALLET')).toBe(walletTotal);
-
-    const balances = ledger.snapshot();
-    const net = Object.values(balances).reduce((sum, value) => sum + value, 0);
-    expect(net).toBe(0);
-  });
-
-  it('Huetchenspiel und Wuerfeltisch fuettern das eigene Casino', () => {
-    const ledger = new Ledger({ PLAYER_CASH: fromVC(100), CASINO_VAULT: fromVC(500) });
-    const floor = new CasinoFloor(ledger, new Prng(31));
-    const shell = floor.placeItem('SHELL_CART', 1, 1);
-    const dice = floor.placeItem('DICE_TABLE', 2, 2);
-    expect(shell.buildableId).toBe('SHELL_CART');
-    expect(dice.buildableId).toBe('DICE_TABLE');
-    expect(floor.slots).toHaveLength(0);
-    expect(floor.games).toHaveLength(2);
-
     let spins = 0;
-    for (let tick = 0; tick < 300; tick += 1) spins += floor.tickCasinoFloor().spins;
+    let bets = ZERO_VC;
+    let payouts = ZERO_VC;
+    for (let tick = 0; tick < 500; tick += 1) {
+      const result = floor.tickCasinoFloor();
+      spins += result.spins;
+      bets = addVC(bets, result.bets);
+      payouts = addVC(payouts, result.payouts);
+    }
+
     expect(spins).toBeGreaterThan(0);
+    expect(bets).toBeGreaterThan(ZERO_VC);
+    expect(ledger.getBalance('CASINO_VAULT')).toBe(subVC(addVC(vaultBefore, bets), payouts));
+    expect(ledger.getBalance('VISITOR_WALLET')).toBe(
+      floor.visitors.reduce((sum, visitor) => sum + visitor.wallet, 0),
+    );
     expect(ledger.verifyLedgerIntegrity()).toBe(true);
-    expect(ledger.getBalance('CASINO_VAULT')).toBeGreaterThan(0);
   });
 
-  it('Schlaegerei beim Tuersteher zahlt nur den Netto-Notgroschen', () => {
-    let brawlSeen = false;
-    for (let seed = 1; seed <= 200 && !brawlSeen; seed += 1) {
-      const ledger = new Ledger();
-      const hustle = new HustleWork(ledger, new Prng(seed));
-      const result = hustle.work('BOUNCER_SHIFT', 0);
-      if (result.brawl) {
-        brawlSeen = true;
-        expect(result.net).toBe(fromVC(0.2));
-        expect(result.gross).toBe(fromVC(1.2));
-        expect(ledger.getBalance('PLAYER_CASH')).toBe(fromVC(0.2));
-      }
+  it('riskiert Startkapital im Standard-CPU-Casino, ohne Geld zu drucken', () => {
+    const ledger = new Ledger({
+      PLAYER_CASH: fromVC(5),
+      CPU_CASINO_POOL: fromVC(500),
+    });
+    const prng = new Prng(4242);
+    const start = ledger.getBalance('PLAYER_CASH');
+    let bets = ZERO_VC;
+    let payouts = ZERO_VC;
+    let rounds = 0;
+
+    while (ledger.getBalance('PLAYER_CASH') >= fromVC(0.3) && rounds < 80) {
+      const spin = playCpuCasinoSpin('CPU_DIVE_BAR', fromVC(0.1), ledger, prng, rounds);
+      bets = addVC(bets, spin.totalBet);
+      payouts = addVC(payouts, spin.payout);
+      rounds += 1;
     }
-    expect(brawlSeen).toBe(true);
+
+    expect(rounds).toBeGreaterThan(0);
+    expect(ledger.getBalance('PLAYER_CASH')).toBe(subVC(addVC(start, payouts), bets));
+    expect(ledger.verifyLedgerIntegrity()).toBe(true);
+  });
+
+  it('verlangt für den nächsten Standort Umsatz, mehrere Spiele und Bargeld', () => {
+    const items = [
+      { buildableId: 'SHELL_CART' as const },
+      { buildableId: 'SLOT_RUSTY' as const },
+      { buildableId: 'DECO_CARPET' as const },
+    ];
+    const growth = growthFrom(items, fromVC(10), 1);
+    expect(growth.gameCount).toBe(2);
+    expect(growth.uniqueKinds).toBe(2);
+    expect(growth.buildValueVC).toBe(fromVC(28));
+
+    expect(canUpgradeVenue(1, growth, fromVC(49))).toBe(false);
+    expect(upgradeBlockers(1, growth, fromVC(49)).length).toBe(1);
+    expect(canUpgradeVenue(1, growth, fromVC(50))).toBe(true);
+    expect(upgradeBlockers(1, growth, fromVC(50))).toEqual([]);
+    expect(canEnterCpuCasino(1, 1)).toBe(true);
+    expect(canEnterCpuCasino(1, 2)).toBe(false);
+    expect(canEnterCpuCasino(3, 2)).toBe(true);
+  });
+
+  it('süchtige Gäste setzen maximal und bleiben bis zum Bankrott', () => {
+    const ledger = new Ledger({ CASINO_VAULT: fromVC(1) });
+    const floor = new CasinoFloor(ledger, new Prng(77), { venueTier: 1, enforceVenue: true });
+    const shell = floor.ensureStarterGame()!;
+    floor.restore({
+      ticks: 0,
+      nextId: 2,
+      items: [shell],
+      visitors: [guest(0.3, 100, 1)],
+      venueTier: 1,
+      size: 4,
+    });
+
+    const locked = floor.tickCasinoFloor();
+    expect(locked.spins).toBe(1);
+    expect(locked.bets).toBe(fromVC(0.3));
+    expect(floor.visitors[0]?.patience).toBe(100);
+
+    const brokeLedger = new Ledger({ CASINO_VAULT: fromVC(1) });
+    const brokeFloor = new CasinoFloor(brokeLedger, new Prng(78), { venueTier: 1, enforceVenue: true });
+    const brokeShell = brokeFloor.ensureStarterGame()!;
+    brokeFloor.restore({
+      ticks: 0,
+      nextId: 2,
+      items: [brokeShell],
+      visitors: [guest(0.04, 100, 100)],
+      venueTier: 1,
+      size: 4,
+    });
+    const broke = brokeFloor.tickCasinoFloor();
+    expect(broke.spins).toBe(0);
+    expect(broke.left).toBe(1);
+    expect(brokeFloor.visitors).toHaveLength(0);
+    expect(brokeLedger.verifyLedgerIntegrity()).toBe(true);
+  });
+
+  it('ohne gebautes Spiel gibt es keine Floor-Spins', () => {
+    const ledger = new Ledger({ CASINO_VAULT: fromVC(100) });
+    const floor = new CasinoFloor(ledger, new Prng(11));
+    let spins = 0;
+    for (let tick = 0; tick < 120; tick += 1) spins += floor.tickCasinoFloor().spins;
+
+    expect(spins).toBe(0);
+    expect(floor.games).toHaveLength(0);
+    expect(ledger.getBalance('CASINO_VAULT')).toBe(fromVC(100));
+    expect(ledger.verifyLedgerIntegrity()).toBe(true);
   });
 });

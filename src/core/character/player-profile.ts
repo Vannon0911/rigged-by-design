@@ -1,7 +1,8 @@
 /** RPG-Profil des Spielers: Aussehen, Player-Mods, Suspicion, Reputation. Headless. */
-import { applyBouncerPenalty } from './bouncer';
 import { DEFAULT_APPEARANCE, resolveVenue, type Appearance, type VenueId } from './appearance';
-import type { Ledger, LedgerEntry } from '../economy/ledger';
+import { ProfileError } from './profile-error';
+import { SuspicionMeter, type ModUseResult } from './suspicion-meter';
+import type { Ledger } from '../economy/ledger';
 import type { VaCoinMicro } from '../economy/vacoin';
 import {
   PLAYER_MODS,
@@ -15,8 +16,11 @@ import {
   type ResolvedEffects,
 } from '../mods/player-mods';
 
+export { ProfileError } from './profile-error';
+export { SUSPICION_MAX } from './suspicion-meter';
+export type { ModUseResult } from './suspicion-meter';
+
 export const MAX_EQUIPPED_PLAYER_MODS = 4;
-export const SUSPICION_MAX = 100;
 
 export interface PlayerProfileState {
   readonly appearance: Appearance;
@@ -32,79 +36,47 @@ export interface PlayerProfileView {
   readonly cosmetics: readonly ModCosmetic[];
   readonly equippedPlayerMods: readonly PlayerModId[];
   readonly suspicion: number;
+  readonly reputation: number;
+  readonly venue: VenueId;
   readonly effects: ResolvedEffects;
   readonly luckBiasBps: number;
-}
-
-export interface ModUseResult {
-  readonly suspicion: number;
-  readonly ejected: boolean;
-  readonly penalty: VaCoinMicro;
-  readonly lockoutUntilTick: number;
-  readonly ledgerEntry: LedgerEntry | null;
-}
-
-export class ProfileError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ProfileError';
-  }
 }
 
 export class PlayerProfile {
   #appearance: Appearance = { ...DEFAULT_APPEARANCE };
   readonly #equipped: PlayerModId[] = [];
-  #suspicion = 0;
   #reputation = 0;
-  #lockoutUntilTick = 0;
-  #lossStreak = 0;
+  readonly #meter = new SuspicionMeter();
 
   constructor(appearance: Partial<Appearance> = {}) {
     this.#appearance = { ...DEFAULT_APPEARANCE, ...appearance };
   }
 
-  get appearance(): Readonly<Appearance> {
-    return Object.freeze({ ...this.#appearance });
-  }
-  get equippedPlayerMods(): readonly PlayerModId[] {
-    return Object.freeze([...this.#equipped]);
-  }
-  get cosmetics(): readonly ModCosmetic[] {
-    return cosmeticsFor(this.#equipped);
-  }
-  get effects(): ResolvedEffects {
-    return collectEffects(this.#equipped, 'CPU_CASINO_PLAYER');
-  }
-  get suspicion(): number {
-    return this.#suspicion;
-  }
-  get reputation(): number {
-    return this.#reputation;
-  }
-  get lossStreak(): number {
-    return this.#lossStreak;
-  }
-  get luckBiasBps(): number {
-    return luckBiasFor(this.#equipped, this.#lossStreak, 'CPU_CASINO_PLAYER');
-  }
-  get lockoutUntilTick(): number {
-    return this.#lockoutUntilTick;
-  }
+  get appearance(): Readonly<Appearance> { return Object.freeze({ ...this.#appearance }); }
+  get equippedPlayerMods(): readonly PlayerModId[] { return Object.freeze([...this.#equipped]); }
+  get cosmetics(): readonly ModCosmetic[] { return cosmeticsFor(this.#equipped); }
+  get effects(): ResolvedEffects { return collectEffects(this.#equipped, 'CPU_CASINO_PLAYER'); }
+  get suspicion(): number { return this.#meter.suspicion; }
+  get reputation(): number { return this.#reputation; }
+  get lossStreak(): number { return this.#meter.lossStreak; }
+  get luckBiasBps(): number { return luckBiasFor(this.#equipped, this.lossStreak, 'CPU_CASINO_PLAYER'); }
+  get lockoutUntilTick(): number { return this.#meter.lockoutUntilTick; }
   get venue(): VenueId { return resolveVenue(this.#reputation); }
 
   toState(): PlayerProfileState {
     return {
       appearance: this.appearance,
       equipped: [...this.#equipped],
-      suspicion: this.#suspicion,
+      suspicion: this.suspicion,
       reputation: this.#reputation,
-      lockoutUntilTick: this.#lockoutUntilTick,
-      lossStreak: this.#lossStreak,
+      lockoutUntilTick: this.lockoutUntilTick,
+      lossStreak: this.lossStreak,
     };
   }
 
   loadState(state: Partial<PlayerProfileState>): void {
-    const safe = (value: number | undefined): number => (Number.isFinite(value) ? Math.max(0, Math.floor(value!)) : 0);
+    const safe = (value: number | undefined): number =>
+      Number.isFinite(value) ? Math.max(0, Math.floor(value!)) : 0;
     this.#appearance = { ...DEFAULT_APPEARANCE, ...state.appearance };
     this.#equipped.length = 0;
     for (const id of state.equipped ?? []) {
@@ -112,10 +84,8 @@ export class PlayerProfile {
       if (this.#equipped.includes(id) || !PLAYER_MODS.some((mod) => mod.id === id)) continue;
       this.#equipped.push(id);
     }
-    this.#suspicion = Math.min(SUSPICION_MAX, safe(state.suspicion));
     this.#reputation = safe(state.reputation);
-    this.#lockoutUntilTick = safe(state.lockoutUntilTick);
-    this.#lossStreak = safe(state.lossStreak);
+    this.#meter.load(state);
   }
 
   setAppearance(patch: Partial<Appearance>): void {
@@ -123,7 +93,9 @@ export class PlayerProfile {
   }
 
   addReputation(points: number): void {
-    if (!Number.isSafeInteger(points) || points < 0) throw new ProfileError('addReputation: Punkte muessen >= 0 sein');
+    if (!Number.isSafeInteger(points) || points < 0) {
+      throw new ProfileError('addReputation: Punkte muessen >= 0 sein');
+    }
     this.#reputation += points;
   }
 
@@ -146,46 +118,17 @@ export class PlayerProfile {
     this.#equipped.splice(index, 1);
   }
 
-  addSuspicion(points: number): void {
-    if (!Number.isSafeInteger(points) || points < 0) throw new ProfileError('addSuspicion: Punkte muessen >= 0 sein');
-    this.#suspicion = Math.min(SUSPICION_MAX, this.#suspicion + points);
-  }
-
-  isLockedOut(tick: number): boolean { return tick < this.#lockoutUntilTick; }
+  addSuspicion(points: number): void { this.#meter.addSuspicion(points); }
+  isLockedOut(tick: number): boolean { return this.#meter.isLockedOut(tick); }
 
   registerModUse(id: PlayerModId, ledger: Ledger, tick: number): ModUseResult {
     if (!this.isEquipped(id)) throw new ProfileError(`${id} ist nicht ausgeruestet`);
-    return this.addHeat(suspicionForUse(this.#equipped, id), ledger, tick);
+    return this.#meter.addHeat(suspicionForUse(this.#equipped, id), ledger, tick);
   }
 
-  /** Heat verbuchen. Bei 100: Rauswurf, 15 % Bargeld weg, 60 s CPU-Casino-Sperre. */
   addHeat(points: number, ledger: Ledger, tick: number): ModUseResult {
-    if (this.isLockedOut(tick)) {
-      throw new ProfileError(`CPU-Casino gesperrt bis Tick ${this.#lockoutUntilTick}`);
-    }
-    this.addSuspicion(points);
-    if (this.#suspicion < SUSPICION_MAX) {
-      return {
-        suspicion: this.#suspicion,
-        ejected: false,
-        penalty: 0 as VaCoinMicro,
-        lockoutUntilTick: this.#lockoutUntilTick,
-        ledgerEntry: null,
-      };
-    }
-    return this.#eject(ledger, tick);
+    return this.#meter.addHeat(points, ledger, tick);
   }
 
-  /** Niete = payout 0, alles andere bricht die Pechserie. */
-  recordSpin(payout: VaCoinMicro): void {
-    this.#lossStreak = payout > 0 ? 0 : this.#lossStreak + 1;
-  }
-
-  #eject(ledger: Ledger, tick: number): ModUseResult {
-    const { penalty, ledgerEntry, lockoutUntilTick } = applyBouncerPenalty(ledger, tick);
-    this.#suspicion = 0;
-    this.#lossStreak = 0;
-    this.#lockoutUntilTick = lockoutUntilTick;
-    return { suspicion: 0, ejected: true, penalty, lockoutUntilTick, ledgerEntry };
-  }
+  recordSpin(payout: VaCoinMicro): void { this.#meter.recordSpin(payout); }
 }

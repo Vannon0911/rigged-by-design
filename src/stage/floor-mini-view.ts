@@ -1,7 +1,10 @@
-/** Top-down Mini-Ansicht des 8x8-Casino-Floors mit Deko, Slots und Besuchern. */
+/** Top-down Mini-Ansicht des dynamischen Venue-Floors mit Deko, Spielen und Besuchern. */
 import { Application, Container, Graphics, Text } from 'pixi.js';
+import type { FloorRoundEvent } from '../core/simulation/floor-events';
 import type { FloorView, PlacedItem } from '../core/simulation/floor-types';
 import { getBuildable } from '../core/simulation/catalog';
+import { PlayerAvatarView, type AvatarViewState } from './player-avatar-view';
+import { VisitorEffectsLayer } from './visitor-effects-layer';
 import { VisitorLayer } from './visitor-layer';
 
 const OX = 12;
@@ -14,18 +17,19 @@ export class FloorMiniView {
   readonly #grid = new Graphics();
   readonly #items = new Graphics();
   readonly #lights = new Graphics();
-  readonly #popups = new Container();
+  readonly #effects: VisitorEffectsLayer;
   readonly #visitorLayer: VisitorLayer;
+  readonly #player: PlayerAvatarView;
   readonly #count: Text;
-  readonly #spun = new Map<number, number>();
   #lastItems: readonly PlacedItem[] = [];
+  #lastEventSeq = 0;
   #destroyed = false;
 
-  constructor(app: Application, cellSize = 34) {
+  constructor(app: Application, cellSize = 34, avatar: AvatarViewState) {
     this.#app = app;
     this.#cell = cellSize;
-    const width = cellSize * 8 + 24;
-    const height = cellSize * 8 + 44;
+    const width = cellSize * 10 + 24;
+    const height = cellSize * 10 + 44;
 
     const bg = new Graphics()
       .roundRect(0, 0, width, height, 12)
@@ -46,41 +50,62 @@ export class FloorMiniView {
 
     this.#visitorLayer = new VisitorLayer(cellSize);
     this.#visitorLayer.container.position.set(OX, OY);
+    this.#effects = new VisitorEffectsLayer(app);
+    this.#player = new PlayerAvatarView(avatar);
+    this.#player.setScale(0.12);
+    this.#player.container.position.set(OX + 2 * cellSize, OY + cellSize * 10 - 2);
     this.container.addChild(
       bg,
       this.#grid,
       this.#items,
       this.#visitorLayer.container,
       this.#lights,
-      this.#popups,
+      this.#effects.container,
+      this.#player.container,
       title,
       this.#count,
     );
     this.#app.ticker.add(this.#blink);
   }
 
-  update(floor: FloorView): void {
+  update(floor: FloorView, events: readonly FloorRoundEvent[] = [], avatar?: AvatarViewState): void {
     if (this.#destroyed) return;
     this.#lastItems = floor.items;
     this.#count.text = `${floor.visitors.length}/10`;
-    this.#drawGrid();
-    this.#drawItems(floor.items);
-    const blocked = new Set(floor.items.map((item) => item.y * 8 + item.x));
-    this.#visitorLayer.update(floor.visitors, blocked);
-    this.#spawnPopups(floor);
+    this.#drawGrid(floor.size);
+    this.#drawItems(floor.items, floor.size);
+    const blocked = new Set(floor.items.map((item) => item.y * floor.size + item.x));
+    this.#visitorLayer.update(floor.visitors, blocked, floor.size);
+    this.#player.container.position.set(OX + 2 * this.#cell, OY + floor.size * this.#cell - 2);
+    if (avatar) this.#player.update(avatar);
+    this.#showEvents(events);
   }
 
   destroy(): void {
     this.#destroyed = true;
+    this.#effects.destroy();
+    this.#player.destroy();
     this.#app.ticker.remove(this.#blink);
     this.container.destroy({ children: true });
   }
 
-  #drawGrid(): void {
+  #showEvents(events: readonly FloorRoundEvent[]): void {
+    for (const event of events) {
+      if (event.seq <= this.#lastEventSeq) continue;
+      this.#lastEventSeq = event.seq;
+      const position = this.#visitorLayer.positionOf(event.visitorId) ?? {
+        x: event.gameX * this.#cell + this.#cell / 2,
+        y: event.gameY * this.#cell + this.#cell / 2,
+      };
+      this.#effects.showRound(event, OX + position.x, OY + position.y);
+    }
+  }
+
+  #drawGrid(size: number): void {
     const g = this.#grid;
     g.clear();
-    for (let y = 0; y < 8; y += 1) {
-      for (let x = 0; x < 8; x += 1) {
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < size; x += 1) {
         const px = OX + x * this.#cell;
         const py = OY + y * this.#cell;
         g.rect(px, py, this.#cell, this.#cell)
@@ -90,11 +115,12 @@ export class FloorMiniView {
     }
   }
 
-  #drawItems(items: readonly PlacedItem[]): void {
+  #drawItems(items: readonly PlacedItem[], size: number): void {
     const g = this.#items;
     const c = this.#cell;
     g.clear();
     for (const item of items) {
+      if (item.x >= size || item.y >= size) continue;
       const px = OX + item.x * c;
       const py = OY + item.y * c;
       const buildable = getBuildable(item.buildableId);
@@ -117,6 +143,25 @@ export class FloorMiniView {
         g.roundRect(px + 4, py + 8, c - 8, c - 16, 3).fill(0x0d2a1a).stroke({ width: 1, color: 0x00ffcc, alpha: 0.7 });
         g.circle(px + c / 2, py + c / 2, 4).fill(0xe8e2d0);
         g.circle(px + c / 2, py + c / 2, 1.5).fill(0x1a1a1a);
+      } else if (buildable.kind === 'ROULETTE') {
+        g.circle(px + c / 2, py + c / 2, c / 2 - 5).fill(0x123322).stroke({ width: 1, color: 0xd4af37, alpha: 0.8 });
+        for (let spoke = 0; spoke < 8; spoke += 1) {
+          const angle = (Math.PI * 2 * spoke) / 8;
+          g.circle(px + c / 2 + Math.cos(angle) * (c / 2 - 9), py + c / 2 + Math.sin(angle) * (c / 2 - 9), 2)
+            .fill(spoke % 2 === 0 ? 0xff2e4d : 0x16161e);
+        }
+        g.circle(px + c / 2, py + c / 2, 3).fill(0xffd166);
+      } else if (buildable.kind === 'BLACKJACK' || buildable.kind === 'POKER') {
+        const accent = buildable.kind === 'BLACKJACK' ? 0xd4af37 : 0xb06bff;
+        g.roundRect(px + 4, py + 7, c - 8, c - 14, 3).fill(0x10301f).stroke({ width: 1, color: accent, alpha: 0.75 });
+        const card = (offset: number, rotation: number): void => {
+          g.roundRect(px + c / 2 - 6 + offset, py + c / 2 - 8 + rotation, 12, 16, 2)
+            .fill(0xf3efe3)
+            .stroke({ width: 1, color: 0x1a1a22, alpha: 0.6 });
+        };
+        card(-4, -1);
+        card(4, 1);
+        g.rect(px + c / 2 - 2, py + c / 2 - 4, 3, 8).fill(accent);
       } else if (buildable.id === 'DECO_NEON_SIGN') {
         g.roundRect(px + 5, py + 7, c - 10, c - 14, 2).fill(0x073b3b).stroke({ width: 1, color: 0x00ffcc, alpha: 0.9 });
         g.rect(px + 9, py + c / 2 - 1, c - 18, 2).fill({ color: 0x00ffcc, alpha: 0.7 });
@@ -125,43 +170,6 @@ export class FloorMiniView {
         g.circle(px + c / 2, py + 11, 2.5).fill({ color: 0xe0b3ff, alpha: 0.9 });
       }
     }
-  }
-
-  #spawnPopups(floor: FloorView): void {
-    for (const visitor of floor.visitors) {
-      const position = this.#visitorLayer.positionOf(visitor.id);
-      if (!position) continue;
-      const previous = this.#spun.get(visitor.id) ?? 0;
-      this.#spun.set(visitor.id, visitor.spins);
-      if (visitor.spins > previous) this.#popup(OX + position.x, OY + position.y - 12);
-    }
-  }
-
-  #popup(x: number, y: number): void {
-    const label = new Text({
-      text: '+VC',
-      style: { fontFamily: 'monospace', fontSize: 10, fill: 0xffd166, fontWeight: 'bold' },
-    });
-    label.anchor.set(0.5);
-    label.position.set(x, y);
-    this.#popups.addChild(label);
-    const started = performance.now();
-
-    const tick = (): void => {
-      if (this.#destroyed) {
-        this.#app.ticker.remove(tick);
-        label.destroy();
-        return;
-      }
-      const progress = Math.min(1, (performance.now() - started) / 700);
-      label.y = y - 18 * progress;
-      label.alpha = 1 - progress;
-      if (progress >= 1) {
-        this.#app.ticker.remove(tick);
-        label.destroy();
-      }
-    };
-    this.#app.ticker.add(tick);
   }
 
   #blink = (): void => {

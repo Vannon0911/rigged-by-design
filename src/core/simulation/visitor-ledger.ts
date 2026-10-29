@@ -1,4 +1,4 @@
-/** Bucht Besuchergeld explizit zwischen EXTERNAL_WORK, VISITOR_WALLET und Tresor. */
+/** Bucht Besuchergeld explizit zwischen EXTERNAL_WORK, VISITOR_WALLET, PENDING_PAYOUT und Tresor. */
 import type { Ledger } from '../economy/ledger';
 import { addVC, subVC, ZERO_VC, type VaCoinMicro } from '../economy/vacoin';
 import type { Visitor } from './visitors';
@@ -13,6 +13,7 @@ export function placeVisitorBet(
   amount: VaCoinMicro,
   tick: number,
 ): void {
+  if (visitor.pendingPayout > ZERO_VC) throw new Error(`visitor #${visitor.id}: offene Auszahlung blockiert`);
   if (amount <= ZERO_VC || amount > visitor.wallet) {
     throw new Error(`visitor bet #${visitor.id}: Betrag ${amount} passt nicht zur Wallet ${visitor.wallet}`);
   }
@@ -20,18 +21,30 @@ export function placeVisitorBet(
   visitor.wallet = subVC(visitor.wallet, amount);
 }
 
-export function payVisitorWin(
+/** Reserve a win in the vault; the guest only gets it when the player pays out. */
+export function reserveVisitorWin(
   ledger: Ledger,
   visitor: Visitor,
   amount: VaCoinMicro,
   tick: number,
 ): void {
   if (amount <= ZERO_VC) return;
-  ledger.transfer('CASINO_VAULT', 'VISITOR_WALLET', amount, `visitor win #${visitor.id}`, tick);
+  ledger.transfer('CASINO_VAULT', 'PENDING_PAYOUT', amount, `visitor win #${visitor.id}`, tick);
+  visitor.pendingPayout = addVC(visitor.pendingPayout, amount);
+}
+
+/** Explicit cashier action. Returns the amount that moved to the guest. */
+export function payoutVisitor(ledger: Ledger, visitor: Visitor, tick: number): VaCoinMicro {
+  const amount = visitor.pendingPayout;
+  if (amount <= ZERO_VC) return ZERO_VC;
+  ledger.transfer('PENDING_PAYOUT', 'VISITOR_WALLET', amount, `visitor payout #${visitor.id}`, tick);
   visitor.wallet = addVC(visitor.wallet, amount);
+  visitor.pendingPayout = ZERO_VC;
+  return amount;
 }
 
 export function releaseVisitor(ledger: Ledger, visitor: Visitor, tick: number): void {
+  if (visitor.pendingPayout > ZERO_VC) throw new Error(`visitor #${visitor.id}: offene Auszahlung`);
   if (visitor.wallet <= ZERO_VC) return;
   ledger.transfer('VISITOR_WALLET', 'EXTERNAL_WORK', visitor.wallet, `visitor cash-out #${visitor.id}`, tick);
   visitor.wallet = ZERO_VC;
@@ -40,6 +53,12 @@ export function releaseVisitor(ledger: Ledger, visitor: Visitor, tick: number): 
 export function visitorPoolTotal(visitors: readonly Visitor[]): VaCoinMicro {
   let total = ZERO_VC;
   for (const visitor of visitors) total = addVC(total, visitor.wallet);
+  return total;
+}
+
+export function pendingPayoutTotal(visitors: readonly Visitor[]): VaCoinMicro {
+  let total = ZERO_VC;
+  for (const visitor of visitors) total = addVC(total, visitor.pendingPayout);
   return total;
 }
 

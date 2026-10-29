@@ -2,7 +2,9 @@
 import { ZERO_VC, addVC, fromVC, mulVC, type VaCoinMicro } from '../../economy/vacoin';
 import { applyWeightBias } from '../../rng/bias-policy';
 import { Prng } from '../../rng/prng';
-import { getTheoreticalProbabilities, pickWeighted } from '../../rng/weighted-pool';
+import { rollWeightedNumber } from '../../rng/number-rng';
+import { manipulationForBand } from '../../rng/number-band';
+import { getTheoreticalProbabilities } from '../../rng/weighted-pool';
 import {
   DEVIL_ENTRIES,
   DICE_FACES,
@@ -84,8 +86,11 @@ export function getDiceWeights(config: DiceConfig): Readonly<Record<string, numb
 export function rollDice(config: DiceConfig, prng: Prng): DiceFace[] {
   const weights = getDiceWeights(config);
   const entries = DICE_FACES.map((face) => ({ value: face, weight: weights[String(face)]! }));
+  const manipulation = manipulationForBand(entries, config.manipulation ?? {});
   const dice: DiceFace[] = [];
-  for (let index = 0; index < config.diceCount; index += 1) dice.push(pickWeighted(entries, prng));
+  for (let index = 0; index < config.diceCount; index += 1) {
+    dice.push(rollWeightedNumber(entries, manipulation, prng).value);
+  }
   return dice;
 }
 
@@ -101,7 +106,7 @@ export function playDiceRound(config: DiceConfig, prng: Prng, bet: VaCoinMicro):
 
   let devil: DevilFace | null = null;
   if (config.devilDie) {
-    devil = pickWeighted(DEVIL_ENTRIES, prng);
+    devil = rollWeightedNumber(DEVIL_ENTRIES, manipulationForBand(DEVIL_ENTRIES, config.manipulation ?? {}), prng).value;
     if (devil === 'SKULL') payout = ZERO_VC;
     else if (devil === 'GOLD') payout = mulVC(payout, 30_000);
   }

@@ -16,6 +16,8 @@ const C = {
   sevenShadow: 0xff7a00,
   diamond: 0x00ffcc,
   diamondGlow: 0xbafff2,
+  wild: 0xa855f7,
+  wildGlow: 0xf0abfc,
 } as const;
 
 export function createSymbolTile(symbol: SlotSymbol, size = SYMBOL_TILE_SIZE): Container {
@@ -38,6 +40,7 @@ function drawSymbol(g: Graphics, symbol: SlotSymbol): void {
   if (symbol === 'CHERRY') return drawCherry(g);
   if (symbol === 'BELL') return drawBell(g);
   if (symbol === 'SEVEN') return drawSeven(g);
+  if (symbol === 'WILD') return drawWild(g);
   return drawDiamond(g);
 }
 
@@ -82,6 +85,20 @@ function drawSeven(g: Graphics): void {
   g.poly(seven).fill(C.seven);
   g.poly(seven).stroke({ width: 2, color: 0xffb3d9, alpha: 0.85 });
   g.poly([18, 12, 50, 12, 50, 17, 18, 17]).fill({ color: 0xfff0f6, alpha: 0.25 });
+}
+
+function drawWild(g: Graphics): void {
+  const star = [32, 8, 38, 25, 56, 25, 42, 36, 47, 54, 32, 43, 17, 54, 22, 36, 8, 25, 26, 25];
+  g.poly(star).fill(C.wild);
+  g.poly(star).stroke({ width: 2, color: C.wildGlow, alpha: 0.95 });
+  g.circle(32, 31, 12).fill(0x160b22).stroke({ width: 2, color: C.wildGlow, alpha: 0.8 });
+  const label = 'W';
+  const bars = [0, 1, 2];
+  for (const index of bars) {
+    const x = 24 + index * 7;
+    g.moveTo(x, 23).lineTo(x + (index === 1 ? 4 : 0), 39).stroke({ width: 3, color: 0xffffff });
+  }
+  if (label) g.circle(32, 31, 16).stroke({ width: 1, color: C.wild, alpha: 0.4 });
 }
 
 function drawDiamond(g: Graphics): void {

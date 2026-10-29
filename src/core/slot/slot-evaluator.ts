@@ -1,8 +1,7 @@
-/** Mathematischer Beweis: echte Spins, RTP, Trefferquote, Suchtdruck. */
+/** Mathematischer Beweis: echte Spins, RTP, Trefferquote, Suchtdruck ueber dynamische Rollen. */
 import { addVC, ZERO_VC, type VaCoinMicro } from '../economy/vacoin';
 import { Prng } from '../rng/prng';
-import { getTheoreticalProbabilities } from '../rng/weighted-pool';
-import { getEffectiveWeights, spinSlot } from './slot-engine';
+import { getTheoreticalSymbolProbabilities, resolvePaylines, resolveReels, spinSlot } from './slot-engine';
 import { SLOT_SYMBOLS, type SlotConfig, type SlotSymbol } from './slot-types';
 
 export interface SymbolDeviation {
@@ -15,6 +14,8 @@ export interface SymbolDeviation {
 export interface SlotMathProof {
   readonly sampleSize: number;
   readonly seed: number;
+  readonly reelCount: number;
+  readonly paylineCount: number;
   readonly hitRate: number;
   readonly ldwRate: number;
   readonly nearMissRate: number;
@@ -26,12 +27,25 @@ export interface SlotMathProof {
   readonly totalBet: VaCoinMicro;
 }
 
-const RTP_PENALTY_THRESHOLD = 0.65;
-const RTP_PENALTY_WEIGHT = 25;
-const CELLS_PER_SPIN = 9;
-
 function percent(count: number, total: number): number {
   return total === 0 ? 0 : (count / total) * 100;
+}
+
+function addictionScore(
+  hitRate: number,
+  ldwRate: number,
+  nearMissRate: number,
+  reelCount: number,
+  paylineCount: number,
+  measuredRTP: number,
+): number {
+  if (measuredRTP < 0.05) return 0;
+  const rtpPenalty = measuredRTP < 0.65 ? (0.65 - measuredRTP) * 25 : 0;
+  const winPaths = (reelCount - 2) * 4 + paylineCount * 4;
+  return Math.max(
+    0,
+    Math.min(100, Math.round(hitRate * 0.9 + ldwRate * 1.1 + nearMissRate * 1.3 + winPaths - rtpPenalty)),
+  );
 }
 
 export function proveSlotMath(config: SlotConfig, sampleSize = 10_000, seed = 42): SlotMathProof {
@@ -41,9 +55,9 @@ export function proveSlotMath(config: SlotConfig, sampleSize = 10_000, seed = 42
   if (!Number.isSafeInteger(seed)) throw new Error('proveSlotMath: seed muss eine Ganzzahl sein');
 
   const prng = new Prng(seed);
-  const weights = getEffectiveWeights(config);
-  const entries = SLOT_SYMBOLS.map((value) => ({ value, weight: weights[value] }));
-  const theoretical = getTheoreticalProbabilities(entries);
+  const reels = resolveReels(config);
+  const paylines = resolvePaylines(config);
+  const theoretical = getTheoreticalSymbolProbabilities(config);
   const counts = Object.fromEntries(SLOT_SYMBOLS.map((symbol) => [symbol, 0])) as Record<SlotSymbol, number>;
 
   let hits = 0;
@@ -66,22 +80,9 @@ export function proveSlotMath(config: SlotConfig, sampleSize = 10_000, seed = 42
   const ldwRate = percent(ldw, sampleSize);
   const nearMissRate = percent(nearMiss, sampleSize);
   const measuredRTP = totalBet > 0 ? totalPayout / totalBet : 0;
-  const houseEdge = 1 - measuredRTP;
-  const rtpPenalty =
-    measuredRTP < RTP_PENALTY_THRESHOLD ? (RTP_PENALTY_THRESHOLD - measuredRTP) * RTP_PENALTY_WEIGHT : 0;
-  const addictionScore = Math.max(
-    0,
-    Math.min(
-      100,
-      Math.round(
-        hitRate * 0.9 + ldwRate * 1.1 + nearMissRate * 1.3 + config.paylines.length * 4 - rtpPenalty,
-      ),
-    ),
-  );
-
-  const drawnCells = sampleSize * CELLS_PER_SPIN;
+  const drawnCells = sampleSize * reels.length * 3;
   const symbolDistribution = SLOT_SYMBOLS.map((symbol) => {
-    const theoreticalPct = (theoretical.get(symbol) ?? 0) * 100;
+    const theoreticalPct = (theoretical[symbol] ?? 0) * 100;
     const measuredPct = percent(counts[symbol], drawnCells);
     return { symbol, theoreticalPct, measuredPct, deltaPct: measuredPct - theoreticalPct };
   });
@@ -89,12 +90,14 @@ export function proveSlotMath(config: SlotConfig, sampleSize = 10_000, seed = 42
   return {
     sampleSize,
     seed,
+    reelCount: reels.length,
+    paylineCount: paylines.length,
     hitRate,
     ldwRate,
     nearMissRate,
     measuredRTP,
-    houseEdge,
-    addictionScore,
+    houseEdge: 1 - measuredRTP,
+    addictionScore: addictionScore(hitRate, ldwRate, nearMissRate, reels.length, paylines.length, measuredRTP),
     symbolDistribution,
     totalPayout,
     totalBet,

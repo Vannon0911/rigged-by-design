@@ -1,4 +1,5 @@
 /** Aussehen und Standort-Progression des Spielers. Headless, ohne Pixi. */
+import type { VaCoinMicro } from '../economy/vacoin';
 export type BodyTone = 'PALE' | 'TAN' | 'OLIVE' | 'DEEP';
 export type OutfitId = 'RAGS' | 'STREET' | 'SUIT' | 'MOGUL';
 export type FaceId = 'PLAIN' | 'SCAR' | 'GRIN';
@@ -44,4 +45,9 @@ export function resolveVenue(reputation: number): VenueId {
   let venue: VenueId = 'BACKROOM';
   for (const candidate of VENUES) if (reputation >= candidate.minReputation) venue = candidate.id;
   return venue;
+}
+
+/** Ausbau-Reputation: jeder investierte VC bringt zehn Rufpunkte, mindestens zehn. */
+export function reputationForBuild(priceVC: VaCoinMicro): number {
+  return Math.max(10, Math.round(priceVC / 1_000));
 }

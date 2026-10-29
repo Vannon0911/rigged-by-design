@@ -2,7 +2,7 @@
 /** Spielautomat im Sleazy-Neon-Gutter-Stil. Reines Rendering, die Spiellogik bleibt im Core. */
 import { Application, Container, Graphics, Text } from 'pixi.js';
 import { toVCString } from '../core/economy/vacoin';
-import { PAYLINES, SLOT_SYMBOLS, type SlotSymbol, type SpinResult } from '../core/slot/slot-types';
+import { SLOT_SYMBOLS, type SlotSymbol, type SpinResult } from '../core/slot/slot-types';
 import { SlotPayoutFx } from './slot-payout-fx';
 import { createSymbolTile } from './symbol-graphics';
 
@@ -35,7 +35,7 @@ function randomSymbol(): SlotSymbol {
 }
 
 function isPremium(symbol: SlotSymbol): boolean {
-  return symbol === 'VACOIN_DIAMOND' || symbol === 'SEVEN';
+  return symbol === 'VACOIN_DIAMOND' || symbol === 'SEVEN' || symbol === 'WILD';
 }
 
 export class SlotMachineView {
@@ -282,7 +282,7 @@ export class SlotMachineView {
   #drawWinLines(result: SpinResult): void {
     this.#winLayer.clear();
     for (const win of result.lineWins) {
-      const rows = PAYLINES[win.payline];
+      const rows = win.rows;
       const xs = [0, 1, 2].map((reel) => WINDOW_X + reel * REEL + REEL / 2);
       const ys = [0, 1, 2].map((reel) => WINDOW_Y + rows[reel]! * REEL + REEL / 2);
       const trace = (g: Graphics): Graphics => g.moveTo(xs[0]!, ys[0]!).lineTo(xs[1]!, ys[1]!).lineTo(xs[2]!, ys[2]!);
