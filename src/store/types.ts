@@ -1,39 +1,29 @@
-/** Snapshot-Typen: alles, was die UI sieht. Kein Zugriff auf interne Stores. */
+/** Was die UI sieht: Welt plus abgeleitete Ledger-Werte. */
 import type { VaCoinMicro } from '../core/economy/vacoin';
-import type { FloorRoundEvent } from '../core/floor/events';
-import type { PlacedItem } from '../core/floor/types';
-import type { MachineState } from '../core/machine/machine';
-import type { ReelId } from '../core/offer/reels';
-import type { HouseSpinResult } from '../core/visit/houses';
-import type { Visitor } from '../core/visitors/visitor';
-import type { VenueTier } from '../core/venues';
+import type { Guest, Player, PriceBook, StaffState, TemplateId, Zone, Furniture, CarpetId } from '../core/sim/types';
 
-export interface UpgradeView {
-  readonly name: string;
-  readonly cost: VaCoinMicro;
-  readonly machinesNeeded: number;
-  readonly machines: number;
-  readonly available: boolean;
-  readonly blockers: readonly string[];
-}
-
-export interface GameSnapshot {
-  readonly cash: VaCoinMicro;
-  readonly vault: VaCoinMicro;
-  readonly pending: VaCoinMicro;
-  readonly revenue: VaCoinMicro;
-  readonly visitors: readonly Visitor[];
-  readonly machines: readonly MachineState[];
-  readonly items: readonly PlacedItem[];
-  readonly ownedReels: readonly ReelId[];
-  readonly venueTier: VenueTier;
-  readonly venueName: string;
-  readonly gridSize: number;
+export interface GameView {
+  readonly template: TemplateId;
+  readonly size: number;
+  readonly zones: readonly Zone[];
+  readonly furniture: readonly Furniture[];
+  readonly guests: readonly Guest[];
+  readonly capacity: number;
+  readonly player: Player;
+  readonly dirtyTiles: readonly number[];
   readonly tick: number;
+  readonly day: number;
+  readonly staff: StaffState;
+  readonly prices: PriceBook;
+  readonly carpet: CarpetId;
+  readonly lastEvent: string;
+  readonly house: VaCoinMicro;
+  readonly wallet: VaCoinMicro;
+  readonly desk: VaCoinMicro;
+  readonly pending: VaCoinMicro;
+  readonly guestMoney: Readonly<Record<number, { readonly wallet: VaCoinMicro; readonly pending: VaCoinMicro }>>;
+  readonly mood: number;
+  readonly reputation: number;
   readonly ledgerOk: boolean;
   readonly notice: string;
-  readonly events: readonly FloorRoundEvent[];
-  readonly lastEvent: FloorRoundEvent | null;
-  readonly lastHouse: HouseSpinResult | null;
-  readonly upgrade: UpgradeView | null;
 }

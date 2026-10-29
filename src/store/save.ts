@@ -1,101 +1,108 @@
-/** Spielstand v3: Ledger-Log, Floor und PRNG-Zustand. Aeltere Saves werden verworfen. */
-import { ACCOUNTS, Ledger, type AccountId } from '../core/economy/ledger';
+/** Save v5: Welt + Ledger-Log + PRNG. Nichts anderes besitzt Geld. */
+import { Ledger } from '../core/economy/ledger';
 import type { VaCoinMicro } from '../core/economy/vacoin';
-import type { CasinoFloor } from '../core/floor/floor';
-import type { FloorSnapshot } from '../core/floor/types';
+import { createWorld, ensureStarter } from '../core/sim/templates';
+import type { CarpetId, Furniture, Guest, Player, PriceBook, StaffState, TemplateId, WorldState } from '../core/sim/types';
 
-const SAVE_KEY = 'vcoin.casino.v3';
-const LEGACY_KEY = 'vcoin.casino.v2';
-const ACCOUNT_IDS: ReadonlySet<string> = new Set(ACCOUNTS);
+const KEY = 'vcoin.casino.v5';
+const OLD_KEYS = ['vcoin.casino.v3', 'vcoin.casino.v4'];
 
-export interface SavedTransfer {
+interface SavedEntry {
   readonly tick: number;
-  readonly from: AccountId;
-  readonly to: AccountId;
+  readonly from: string;
+  readonly to: string;
   readonly amount: VaCoinMicro;
   readonly reason: string;
 }
 
 export interface SavedGame {
-  readonly version: 3;
-  readonly ledger: readonly SavedTransfer[];
-  readonly floor: FloorSnapshot;
+  readonly version: 5;
+  readonly template: TemplateId;
+  readonly carpet: CarpetId;
+  readonly furniture: Furniture[];
+  readonly guests: Guest[];
+  readonly player: Player;
+  readonly dirty: number[];
+  readonly prices: PriceBook;
+  readonly staff: StaffState;
   readonly tick: number;
+  readonly day: number;
+  readonly nextGuestId: number;
+  readonly nextFurnitureId: number;
+  readonly guardsHired: number;
+  readonly lastEvent: string;
+  readonly entries: readonly SavedEntry[];
   readonly prngState: number;
 }
 
-function isTransfer(value: unknown): value is SavedTransfer {
-  if (typeof value !== 'object' || value === null) return false;
-  const { tick, from, to, amount, reason } = value as Record<string, unknown>;
-  return (
-    typeof tick === 'number' && Number.isSafeInteger(tick) && tick >= 0 &&
-    typeof from === 'string' && ACCOUNT_IDS.has(from) &&
-    typeof to === 'string' && ACCOUNT_IDS.has(to) && from !== to &&
-    typeof amount === 'number' && Number.isSafeInteger(amount) && amount > 0 &&
-    typeof reason === 'string' && reason.trim().length > 0
-  );
-}
-
-export function replayLedger(entries: readonly SavedTransfer[]): Ledger | null {
-  if (!entries.every(isTransfer)) return null;
-  const ledger = new Ledger();
+export function saveWorld(world: WorldState, ledger: Ledger, prngState: number): void {
   try {
-    for (const entry of entries) ledger.transfer(entry.from, entry.to, entry.amount, entry.reason, entry.tick);
-    return ledger.verifyLedgerIntegrity() ? ledger : null;
-  } catch {
-    return null;
-  }
-}
-
-export function loadSave(): SavedGame | null {
-  try {
-    if (typeof localStorage === 'undefined') return null;
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<SavedGame>;
-    if (parsed.version !== 3 || !Array.isArray(parsed.ledger) || !parsed.ledger.every(isTransfer)) return null;
-    if (!parsed.floor || !Array.isArray(parsed.floor.items) || !Array.isArray(parsed.floor.visitors)) return null;
-    if (!Number.isSafeInteger(parsed.tick) || !Number.isSafeInteger(parsed.prngState)) return null;
-    return parsed as SavedGame;
-  } catch {
-    return null;
-  }
-}
-
-export function saveGame(floor: CasinoFloor, ledger: Ledger, tick: number, prngState: number): void {
-  try {
-    if (typeof localStorage === 'undefined') return;
     const save: SavedGame = {
-      version: 3,
-      ledger: ledger.entries.map(({ tick: entryTick, from, to, amount, reason }) => ({
-        tick: entryTick, from, to, amount, reason,
-      })),
-      floor: floor.snapshot(),
-      tick,
+      version: 5,
+      template: world.template,
+      carpet: world.carpet,
+      furniture: world.furniture,
+      guests: world.guests,
+      player: world.player,
+      dirty: [...world.dirty],
+      prices: world.prices,
+      staff: world.staff,
+      tick: world.tick,
+      day: world.day,
+      nextGuestId: world.nextGuestId,
+      nextFurnitureId: world.nextFurnitureId,
+      guardsHired: world.guardsHired,
+      lastEvent: world.lastEvent,
+      entries: ledger.entries.map(({ tick, from, to, amount, reason }) => ({ tick, from, to, amount, reason })),
       prngState,
     };
-    localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+    localStorage.setItem(KEY, JSON.stringify(save));
+  } catch { /* quota oder storage blocked */ }
+}
+
+export function loadWorld(): { world: WorldState; ledger: Ledger; prngState: number } | null {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw) as Partial<SavedGame>;
+    if (saved.version !== 5 || !saved.template || !Array.isArray(saved.guests) || !Array.isArray(saved.furniture)) return null;
+    const world = createWorld(saved.template, saved.carpet ?? 'VIOLET');
+    world.furniture = saved.furniture.map((item) => ({
+      ...item,
+      occupants: [...(item.occupants ?? [])],
+      mods: [...(item.mods ?? [])],
+      reels: item.reels ?? 3,
+    }));
+    world.guests = saved.guests.map((guest) => ({ ...guest, path: [...(guest.path ?? [])] }));
+    world.player = { ...world.player, ...saved.player, path: [...(saved.player?.path ?? [])] };
+    world.dirty = new Set(saved.dirty ?? []);
+    world.prices = { ...world.prices, ...(saved.prices ?? {}) };
+    world.staff = { ...world.staff, ...(saved.staff ?? {}) };
+    world.tick = saved.tick ?? 0;
+    world.day = saved.day ?? 1;
+    world.nextGuestId = saved.nextGuestId ?? 1;
+    world.nextFurnitureId = saved.nextFurnitureId ?? 100;
+    world.guardsHired = saved.guardsHired ?? 0;
+    world.lastEvent = saved.lastEvent ?? 'Spielstand geladen.';
+    ensureStarter(world);
+    const ledger = new Ledger();
+    for (const entry of saved.entries ?? []) {
+      ledger.transfer(entry.from, entry.to, entry.amount, entry.reason, entry.tick);
+    }
+    if (!ledger.verifyLedgerIntegrity()) return null;
+    return { world, ledger, prngState: saved.prngState ?? 1 };
   } catch {
-    // Quota voll oder Speicher blockiert: das Spiel läuft ohne Auto-Save weiter.
+    return null;
   }
 }
 
-export function clearSave(): void {
+export function clearOldSave(): boolean {
   try {
-    if (typeof localStorage !== 'undefined') localStorage.removeItem(SAVE_KEY);
-  } catch {
-    // ignorieren
-  }
-}
-
-/** Raeumt den inkompatiblen v2-Stand weg und meldet, ob es einen gab. */
-export function consumeLegacySave(): boolean {
-  try {
-    if (typeof localStorage === 'undefined') return false;
-    const had = localStorage.getItem(LEGACY_KEY) !== null;
-    if (had) localStorage.removeItem(LEGACY_KEY);
+    let had = false;
+    for (const key of OLD_KEYS) {
+      had = had || localStorage.getItem(key) !== null;
+      localStorage.removeItem(key);
+    }
     return had;
-  } catch {
-    return false;
-  }
+  } catch { return false; }
 }

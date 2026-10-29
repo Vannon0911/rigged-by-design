@@ -1,85 +1,78 @@
-/** HUD: Bargeld als Held, Tresor, Gäste und vier Aktionen. */
-import { ZERO_VC, toVCString } from '../core/economy/vacoin';
-import { getVenue } from '../core/venues';
-import type { GameSnapshot } from '../store/types';
+/** HUD: ein Blick auf Hauskonto, Gäste und die drei Dinge, die jetzt zählen. */
+import type { GameView } from '../store/types';
+import { vc } from './format';
 
 export interface HudProps {
-  readonly snapshot: GameSnapshot;
+  readonly view: GameView;
   readonly onBuild: () => void;
   readonly onGuests: () => void;
   readonly onVisit: () => void;
-  readonly onUpgrade: () => void;
-  readonly onWithdraw: () => void;
-  readonly onPayAll: () => void;
+  readonly onClean: () => void;
+  readonly onTakeHome: () => void;
 }
 
-export function Hud({ snapshot, onBuild, onGuests, onVisit, onUpgrade, onWithdraw, onPayAll }: HudProps) {
-  const capacity = getVenue(snapshot.venueTier).maxVisitors;
-  const waiting = snapshot.visitors.filter((visitor) => visitor.pendingPayout > ZERO_VC && visitor.patience <= 0).length;
-  const startTip = snapshot.tick < 25 && snapshot.cash <= ZERO_VC && snapshot.ownedReels.length > 0;
-  const machineWord = snapshot.machines.length === 1 ? 'Automat' : 'Automaten';
-  const upgrade = snapshot.upgrade;
+const MOOD_LABEL = (mood: number): string => (mood >= 65 ? 'gut' : mood >= 40 ? 'gemischt' : 'gereizt');
+
+export function Hud({ view, onBuild, onGuests, onVisit, onClean, onTakeHome }: HudProps) {
+  const dirty = view.dirtyTiles.length;
+  const startTip = view.house === 0 && view.guests.length === 0;
+  const mood = view.guests.length ? view.mood : 0;
   return (
     <header className="hud">
       <div className="hud-brand">
-        <span className="hud-mark">VC</span>
+        <span className="hud-mark">R</span>
         <div>
           <strong>RIGGED BY DESIGN</strong>
-          <small>DEIN CASINO. DEINE REGELN.</small>
+          <small>DEIN CASINO · TAG {view.day}</small>
         </div>
       </div>
 
-      <div className="hud-cash">
-        <span>BARGELD</span>
-        <strong>{toVCString(snapshot.cash)}</strong>
-        <small>{snapshot.venueName} · Stufe {snapshot.venueTier}/4</small>
-        {startTip && <small className="hud-tip">Klick den Automaten · Gratis-Walze bereit</small>}
+      <div className="hud-money">
+        <span>HAUSKONTO</span>
+        <strong>{vc(view.house, view.house < 1000 * 10_000 ? 2 : 0)}</strong>
+        <small>
+          Portemonnaie {vc(view.wallet, 2)} · Kasse {vc(view.desk, 2)}
+        </small>
       </div>
 
-      <div className="hud-row">
-        <div className={`hud-stat vault${waiting > 0 ? ' warn' : ''}`}>
-          <span>TRESOR</span>
-          <strong>{toVCString(snapshot.vault)}</strong>
-          <small className="vault-line">
-            <button
-              type="button"
-              className="vault-withdraw"
-              disabled={snapshot.vault <= ZERO_VC}
-              onClick={onWithdraw}
-              title="Tresor komplett in die Kasse"
-            >
-              ABHEBEN
-            </button>
-            {waiting > 0
-              ? `${waiting} ${waiting === 1 ? 'Gast wartet' : 'Gäste warten'} auf Kasse`
-              : `Gewinne offen ${toVCString(snapshot.pending)}`}
-            {waiting > 0 && (
-              <button type="button" className="vault-withdraw gold" onClick={onPayAll}>ALLE ZAHLEN</button>
-            )}
-          </small>
+      <div className="hud-vitals">
+        <div className={`vital${view.pending > 0 ? ' hot' : ''}`}>
+          <span>OFFEN</span>
+          <strong>{vc(view.pending, 2)}</strong>
+          <small>{view.pending > 0 ? 'Gastgewinne warten' : 'nichts offen'}</small>
         </div>
-        <div className="hud-stat">
+        <div className="vital">
           <span>GÄSTE</span>
-          <strong>{snapshot.visitors.length}/{capacity}</strong>
-          <small>{snapshot.machines.length} {machineWord}{waiting > 0 ? ` · ${waiting} an der Kasse` : ''}</small>
+          <strong>{view.guests.length}<em>/{view.capacity}</em></strong>
+          <small>{view.guests.length ? `Laune ${MOOD_LABEL(mood)}` : 'noch leer'}</small>
+        </div>
+        <div className={`vital${dirty > 0 ? ' warn' : ''}`}>
+          <span>ORDNUNG</span>
+          <strong>{view.reputation}<em>%</em></strong>
+          <small>{dirty > 0 ? `${dirty} Flecken` : 'sauber'}</small>
         </div>
       </div>
 
       <div className="hud-actions">
-        <button type="button" className="hud-cta" onClick={onBuild}>+ BAUEN</button>
-        <button type="button" className={waiting > 0 ? 'attention' : undefined} onClick={onGuests}>
-          GÄSTE{waiting > 0 ? ` (${waiting})` : ''}
+        <button type="button" className="btn primary" onClick={onBuild}>BAUEN</button>
+        <button type="button" className={`btn${view.pending > 0 ? ' alert' : ''}`} onClick={onGuests}>
+          GÄSTE{view.pending > 0 ? <b className="badge">{view.guests.filter((g) => (view.guestMoney[g.id]?.pending ?? 0) > 0).length}</b> : null}
         </button>
-        <button type="button" onClick={onVisit}>FREMDES HAUS</button>
-        <button
-          type="button"
-          onClick={onUpgrade}
-          disabled={!upgrade?.available}
-          title={upgrade ? (upgrade.available ? upgrade.name : upgrade.blockers.join(' · ')) : 'Maximale Stufe'}
-        >
-          {upgrade ? `AUSBAUEN ${toVCString(upgrade.cost)}` : 'MAX. STUFE'}
+        <button type="button" className="btn" onClick={onVisit}>FREMDES HAUS</button>
+        <button type="button" className={`btn${dirty > 0 ? ' warm' : ''}`} onClick={onClean}>
+          PUTZEN{dirty > 0 ? <b className="badge">{dirty}</b> : null}
+        </button>
+        <button type="button" className="btn ghost" disabled={view.house <= 0} onClick={onTakeHome} title="Geld vom Hauskonto ins Portemonnaie">
+          ABHEBEN
         </button>
       </div>
+
+      {startTip && (
+        <div className="hud-tip">
+          <span>0 VC. Dein Automat steht gratis.</span>
+          <span>Gäste kommen zum Eingang, wechseln an der Kasse und spielen.</span>
+        </div>
+      )}
     </header>
   );
 }
