@@ -1,0 +1,73 @@
+/** @test-target: src/core/sim/visitors.ts | @error-code: ERR-2001 */
+import { describe, expect, it } from 'vitest';
+import { Ledger } from '../../economy/ledger';
+import { Prng } from '../../rng/prng';
+import { VISITOR_CAP, recordVisitor } from '../visitors';
+import { spawnGuest } from '../spawn';
+import { createWorld } from '../templates';
+import { replaySave } from '../../../store/save';
+
+function setup(seed = 0x7a11) {
+  const world = createWorld('SMALL');
+  const ledger = new Ledger();
+  const prng = new Prng(seed);
+  return { world, ledger, prng };
+}
+
+describe('Besucherprofile', () => {
+  it('legt beim ersten Besuch ein Profil an und verknuepft den Gast damit', () => {
+    const { world, ledger, prng } = setup();
+    const guest = spawnGuest(world, prng, ledger);
+    expect(guest).not.toBeNull();
+    expect(world.visitors).toHaveLength(1);
+    expect(world.visitors[0]).toMatchObject({ visits: 1, name: guest!.name, persona: guest!.persona });
+    expect(guest!.visitorId).toBe(world.visitors[0]!.id);
+  });
+
+  it('erkennt einen Stammgast wieder und zaehlt seine Besuche hoch', () => {
+    const { world, ledger, prng } = setup();
+    const first = spawnGuest(world, prng, ledger);
+    expect(first).not.toBeNull();
+    const profileId = first!.visitorId;
+    world.guests = [];
+    let returned = null;
+    for (let attempt = 0; attempt < 400 && !returned; attempt += 1) {
+      const guest = spawnGuest(world, prng, ledger);
+      if (guest && guest.visitorId === profileId) returned = guest;
+      world.guests = [];
+    }
+    expect(returned).not.toBeNull();
+    expect(returned!.name).toBe(first!.name);
+    expect(returned!.persona).toBe(first!.persona);
+    expect(world.visitors.filter((visitor) => visitor.id === profileId)).toHaveLength(1);
+    expect(world.visitors.find((visitor) => visitor.id === profileId)!.visits).toBeGreaterThan(1);
+  });
+
+  it('begrenzt die Liste auf VISITOR_CAP und verdraengt zuerst den am laengsten nicht gesehenen', () => {
+    const world = createWorld('SMALL');
+    for (let i = 0; i < VISITOR_CAP + 10; i += 1) {
+      recordVisitor(world, { name: `G${i}`, persona: 'STREET', tick: i });
+    }
+    expect(world.visitors.length).toBeLessThanOrEqual(VISITOR_CAP);
+    expect(world.visitors.some((visitor) => visitor.name === `G${VISITOR_CAP + 9}`)).toBe(true);
+    expect(world.visitors.some((visitor) => visitor.name === 'G0')).toBe(false);
+  });
+
+  it('bleibt beim Laden erhalten; alte Staende starten ohne Profile', () => {
+    const v7 = {
+      version: 7, template: 'SMALL', carpet: 'VIOLET', furniture: [], guests: [],
+      player: { position: { x: 2, y: 2 }, path: [], pathIndex: 0, carrying: '' },
+      dirty: [], prices: createWorld('SMALL').prices, staff: createWorld('SMALL').staff,
+      tick: 3, day: 1, nextGuestId: 1, nextFurnitureId: 100, guardsHired: 0,
+      lastEvent: '', entries: [], prngState: 9,
+      visitors: [{ id: 4, name: 'Rita Kern', persona: 'STAMMGAST', visits: 3, lastSeenTick: 2 }],
+      nextVisitorId: 5,
+    };
+    const loaded = replaySave(v7)!;
+    expect(loaded.world.visitors).toEqual(v7.visitors);
+    expect(loaded.world.nextVisitorId).toBe(5);
+    const legacy = replaySave({ ...v7, version: 6, visitors: undefined, nextVisitorId: undefined })!;
+    expect(legacy.world.visitors).toEqual([]);
+    expect(legacy.world.nextVisitorId).toBe(1);
+  });
+});

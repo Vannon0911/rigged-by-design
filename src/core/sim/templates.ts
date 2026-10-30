@@ -60,6 +60,8 @@ export function createWorld(template: TemplateId, carpet: CarpetId = 'VIOLET'): 
     nextAgentId: 1,
     nextDisputeId: 1,
     activePenalties: [],
+    visitors: [],
+    nextVisitorId: 1,
     lastEvent: template === 'SMALL' ? 'Kleine Bude eröffnet. Ein Automat steht gratis.' : 'Neues Haus eröffnet.',
     guardsHired: 0,
   };

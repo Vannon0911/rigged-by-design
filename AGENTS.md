@@ -1,4 +1,14 @@
 # Rigged by Design
+<!-- rtk-instructions v2 -->
+# Command output
+
+Command output here is condensed to save tokens, keeping every signal and
+dropping costly noise. Treat it as the complete result: run commands
+normally, and batch related commands into one call to avoid extra turns.
+Truncated results state their recovery path in their own output. Re-run a
+command as `rtk bypass <cmd>` only when its result is unusable: empty when
+output was clearly expected, contradicting its exit code, or garbled.
+<!-- /rtk-instructions -->
 
 Vite + React 19 + TypeScript + PixiJS 8 casino sim. No real money; VaCoins are integer micro-units (1 VC = 10.000). Simulation is headless in `src/core/`; `world-store` owns world, ledger, PRNG, clock, save.
 

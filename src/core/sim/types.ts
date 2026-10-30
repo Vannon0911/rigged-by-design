@@ -61,6 +61,8 @@ export interface Guest {
   addiction: number;
   /** Tick, ab dem der Spieler diesen Gast erneut ansprechen darf (optional fuer alte Saves). */
   talkReadyTick?: number;
+  /** Verknuepft den Gast mit einem Besucherprofil (fehlt bei alten Staenden). */
+  visitorId?: number;
   sociability: number;
   thirst: number;
   bladder: number;
@@ -150,6 +152,15 @@ export interface Dispute {
   ticks: number;
 }
 
+/** Ein wiedererkennbarer Besucher; bleibt ueber Besuche und Speicherstaende erhalten. */
+export interface Visitor {
+  readonly id: number;
+  readonly name: string;
+  readonly persona: PersonaId;
+  visits: number;
+  lastSeenTick: number;
+}
+
 export interface WorldState {
   template: TemplateId;
   size: number;
@@ -181,13 +192,9 @@ export interface WorldState {
   nextAgentId: number;
   nextDisputeId: number;
   activePenalties: ActivePenalty[];
+  visitors: Visitor[];
+  nextVisitorId: number;
 }
 
-export const TILE = 26;
-export const REGION = 30;
-export const CARPETS: Readonly<Record<CarpetId, { name: string; color: number }>> = {
-  VIOLET: { name: 'Violett', color: 0x1b0f2a },
-  CRIMSON: { name: 'Karmin', color: 0x2a0d17 },
-  JADE: { name: 'Jade', color: 0x0d241f },
-  GOLD: { name: 'Gold', color: 0x2a2210 },
-};
+// Board-Konstanten liegen in eigenem Modul; hier nur re-exportiert, damit Imports gleich bleiben.
+export { TILE, REGION, CARPETS } from './board-constants';

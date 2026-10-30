@@ -3,7 +3,7 @@ import { ZERO_VC, type VaCoinMicro } from '../core/economy/vacoin';
 import { GAME_FOOTPRINT, SERVICE_FOOTPRINT } from '../core/sim/grid-zones';
 import { reputation } from '../core/sim/spawn';
 import { newPlayerRpg } from '../core/sim/player-rpg';
-import type { ActivePenalty, CarpetId, Crate, Dispute, Furniture, Guest, Player, PriceBook, StaffAgent, StaffState, TemplateId, WorldState } from '../core/sim/types';
+import type { ActivePenalty, CarpetId, Crate, Dispute, Furniture, Guest, Player, PriceBook, StaffAgent, StaffState, TemplateId, Visitor, WorldState } from '../core/sim/types';
 
 interface SavedEntry {
   readonly tick: number;
@@ -45,6 +45,8 @@ export interface SavedGame {
   readonly nextAgentId?: number;
   readonly nextDisputeId?: number;
   readonly activePenalties?: ActivePenalty[];
+  readonly visitors?: Visitor[];
+  readonly nextVisitorId?: number;
   readonly lastEvent: string;
   readonly entries: readonly SavedEntry[];
   readonly prngState: number;
@@ -127,6 +129,8 @@ export function hydrateWorld(world: WorldState, saved: SavedGame): Array<{ id: n
     }
   }
   world.activePenalties = (saved.activePenalties ?? []).map((penalty) => ({ ...penalty }));
+  world.visitors = (saved.visitors ?? []).map((visitor) => ({ ...visitor }));
+  world.nextVisitorId = saved.nextVisitorId ?? world.visitors.reduce((max, visitor) => Math.max(max, visitor.id + 1), 1);
   world.lastEvent = saved.lastEvent ?? 'Spielstand geladen.';
   return legacyFiat;
 }
