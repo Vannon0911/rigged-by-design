@@ -21,7 +21,7 @@ export interface GameView {
   readonly wallet: VaCoinMicro;
   readonly desk: VaCoinMicro;
   readonly pending: VaCoinMicro;
-  readonly guestMoney: Readonly<Record<number, { readonly wallet: VaCoinMicro; readonly pending: VaCoinMicro }>>;
+  readonly guestMoney: Readonly<Record<number, { readonly wallet: VaCoinMicro; readonly pending: VaCoinMicro; readonly fiat: VaCoinMicro }>>;
   readonly mood: number;
   readonly reputation: number;
   readonly ledgerOk: boolean;

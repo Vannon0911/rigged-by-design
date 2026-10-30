@@ -1,5 +1,7 @@
 /** Nachfrage: Gäste kommen nur, wenn der Laden sauber, heil und einladend wirkt. */
+import type { Ledger } from '../economy/ledger';
 import type { Prng } from '../rng/prng';
+import { admitFiat } from './money';
 import { attractionOf } from './offers';
 import { makeGuest, randomFiat, randomPersona } from './traits';
 import type { Guest, WorldState } from './types';
@@ -31,14 +33,16 @@ export function serviceCapacity(world: WorldState): number {
   return Math.min(maxGuests(world), 3 + seats * 2);
 }
 
-export function spawnGuest(world: WorldState, prng: Prng): Guest | null {
+export function spawnGuest(world: WorldState, prng: Prng, ledger: Ledger): Guest | null {
   if (world.guests.length >= serviceCapacity(world)) return null;
   const id = world.nextGuestId++;
   const persona = randomPersona(prng, world.template);
   const spawn = spawnPoint(world);
-  const guest = makeGuest({ id, persona, prng, fiat: randomFiat(prng, world.template, persona), spawn });
+  const fiat = randomFiat(prng, world.template, persona);
+  const guest = makeGuest({ id, persona, prng, spawn });
   const target = exchangePoint(world);
   if (!target) return null;
+  admitFiat(ledger, id, fiat, world.tick);
   guest.targetZone = 'exchange';
   guest.path = pathTo(world, spawn, target);
   guest.pathIndex = 0;

@@ -45,6 +45,8 @@ Fremde Casinos sind der Ort, an dem **du Gast bist**. Dort spielst du mit deinem
 
 Jede Buchung läuft über das Ledger. Es gibt kein `addVC` außerhalb einer Buchung, keinen direkten Sprung vom Portemonnaie in den Tresor und keine Geldquelle außerhalb von `EXTERNAL_WORLD`.
 
+Mitgebrachtes Fiat liegt ab dem Spawn als eigenes Konto (`FIAT_<id>`) im Ledger, nicht mehr im Gastobjekt. Eine Auszahlung wird nie still gekappt: Was das Hauskonto nicht deckt, steht als gebuchte Schuld auf `HAUS_SCHULDEN` und der Gast bekommt trotzdem seine volle Summe.
+
 ## Spiele
 
 Sieben Spiele mit unterschiedlichen Charakteren: **Book-of-Ra-Slot, Plinko, Blackjack, Video Poker, Roulette, Hütchenspiel und Würfel**. Am eigenen Automaten gibt es nur den **kostenlosen Testspin** – der Betreiber spielt nicht gegen sein eigenes Haus. In fremden Häusern wird mit richtigem Portemonnaie-Geld gespielt, inklusive optionalem Vollbild.
@@ -103,7 +105,7 @@ npm ci
 npm run dev
 ```
 
-Der Dev-Server läuft auf [http://localhost:3000](http://localhost:3000). Ein frischer Stand beginnt mit 0 VC und einem Gratis-Automaten. Alte Spielstände aus v3/v4 werden verworfen; der aktuelle Save ist v5.
+Der Dev-Server läuft auf [http://localhost:3000](http://localhost:3000). Ein frischer Stand beginnt mit 0 VC und einem Gratis-Automaten. Der aktuelle Save ist v6: v5-Stände werden beim Laden migriert und behalten Fiat sowie offene Gewinne; v3/v4 werden verworfen.
 
 Alle Gates:
 

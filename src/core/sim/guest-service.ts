@@ -1,7 +1,7 @@
 /** Gast verlässt den Floor, wird wütend und wird ausgezahlt. */
 import type { Ledger } from '../economy/ledger';
 import { ZERO_VC } from '../economy/vacoin';
-import { guestAccount, payPending } from './money';
+import { closeFiat, exchangeFromVc, guestAccount, payPending } from './money';
 import type { Furniture, Guest, WorldState } from './types';
 import { furnitureById, releaseSeat, sendGuest } from './world';
 
@@ -24,15 +24,21 @@ export function leave(world: WorldState, guest: Guest): void {
   else guest.path = [];
 }
 
+/** Erst alle Ansprueche buchen, dann gehen: ein Fehlschlag laesst Gast und Guthaben stehen. */
 export function payAndLeave(world: WorldState, ledger: Ledger, guest: Guest): void {
   try {
     payPending(ledger, guest.id, world.tick);
     const balance = ledger.getBalance(guestAccount(guest.id));
-    if (balance > ZERO_VC) {
-      ledger.transfer(guestAccount(guest.id), 'WECHSELKASSE', balance, `gast ${guest.id} auszahlen`, world.tick);
-      ledger.transfer('WECHSELKASSE', 'EXTERNAL_WORLD', balance, `gast ${guest.id} cash out`, world.tick);
-    }
-  } catch { /* Kasse ist leer; der Gast geht trotzdem */ }
+    if (balance > ZERO_VC) exchangeFromVc(ledger, guest.id, balance, world.tick);
+    closeFiat(ledger, guest.id, world.tick);
+  } catch {
+    guest.state = 'CASHOUT';
+    guest.stateTicks = 0;
+    guest.path = [];
+    guest.pathIndex = 0;
+    world.lastEvent = `${guest.name} wartet auf die Auszahlung.`;
+    return;
+  }
   leave(world, guest);
 }
 

@@ -3,19 +3,22 @@ import type { Ledger } from '../economy/ledger';
 import { fromVC, ZERO_VC, type VaCoinMicro } from '../economy/vacoin';
 import { playRound, type RoundResult } from '../games/round';
 import type { Prng } from '../rng/prng';
-import { exchangeFromVc, foreignBet, foreignWin, guestAccount, HAUSKONTO, payPending, PORTEMONNAIE, SHOP, STAFF } from './money';
+import { closeFiat, exchangeFromVc, foreignBet, foreignWin, guestAccount, HAUSKONTO, payPending, PORTEMONNAIE, SHOP, STAFF } from './money';
 import { getBuildDef, getMod, type BuildId } from './offers';
 import { blockedTiles, findPath, nearestWalkable } from './pathfinding';
 import type { CarpetId, Furniture, GameId, ModId, Point, WorldState } from './types';
 import { canPlace, furnitureById, guestById, interactionPoint } from './world';
 
-/** Vor einem Umbau: alle Gäste sauber auszahlen, damit kein Ledger-Guthaben in alten Konten haengt. */
+/**
+ * Vor einem Umbau: erst alle Ansprueruche buchen, dann die Gaeste entfernen.
+ * Scheitert eine Buchung, bleibt die Welt unveraendert und der Fehler steigt auf.
+ */
 export function settleGuests(world: WorldState, ledger: Ledger): void {
   for (const guest of world.guests) {
-    try {
-      payPending(ledger, guest.id, world.tick);
-      exchangeFromVc(ledger, guest.id, ledger.getBalance(`VISITOR_${guest.id}`), world.tick);
-    } catch { /* offene Forderung bleibt im Ledger sichtbar */ }
+    payPending(ledger, guest.id, world.tick);
+    const balance = ledger.getBalance(guestAccount(guest.id));
+    if (balance > ZERO_VC) exchangeFromVc(ledger, guest.id, balance, world.tick);
+    closeFiat(ledger, guest.id, world.tick);
   }
   world.guests = [];
 }

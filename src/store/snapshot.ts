@@ -1,7 +1,7 @@
 /** Snapshot aus Welt und Ledger; keine eigene Geldwahrheit in der UI. */
 import type { Ledger } from '../core/economy/ledger';
 import { addVC, ZERO_VC, type VaCoinMicro } from '../core/economy/vacoin';
-import { guestAccount, pendingAccount, HAUSKONTO, PORTEMONNAIE, WECHSELKASSE } from '../core/sim/money';
+import { fiatAccount, guestAccount, pendingAccount, HAUSKONTO, PORTEMONNAIE, WECHSELKASSE } from '../core/sim/money';
 import { reputation, serviceCapacity } from '../core/sim/spawn';
 import type { WorldState } from '../core/sim/types';
 import type { GameView } from './types';
@@ -28,11 +28,11 @@ function worldSnapshot(world: WorldState) {
 export function buildView(world: WorldState, ledger: Ledger, notice: string): GameView {
   let pending: VaCoinMicro = ZERO_VC;
   let mood = 0;
-  const guestMoney: Record<number, { wallet: VaCoinMicro; pending: VaCoinMicro }> = {};
+  const guestMoney: Record<number, { wallet: VaCoinMicro; pending: VaCoinMicro; fiat: VaCoinMicro }> = {};
   for (const guest of world.guests) {
     const wallet = ledger.getBalance(guestAccount(guest.id));
     const open = ledger.getBalance(pendingAccount(guest.id));
-    guestMoney[guest.id] = { wallet, pending: open };
+    guestMoney[guest.id] = { wallet, pending: open, fiat: ledger.getBalance(fiatAccount(guest.id)) };
     pending = addVC(pending, open);
     mood += guest.mood;
   }

@@ -49,7 +49,6 @@ export interface Guest {
   readonly id: number;
   readonly name: string;
   readonly persona: PersonaId;
-  fiat: VaCoinMicro;
   mood: number;
   patience: number;
   addiction: number;

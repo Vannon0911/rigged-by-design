@@ -56,6 +56,7 @@ interface LedgerEntry {
 
 export class Ledger {
   readonly #balances = new Map<AccountId, VaCoinMicro>();
+  readonly #liabilities = new Set<AccountId>();
   readonly #entries: LedgerEntry[] = [];
   #seq = 0;
 
@@ -71,6 +72,13 @@ export class Ledger {
   openAccount(account: AccountId): void {
     if (!account.trim()) throw new LedgerError('Konto darf nicht leer sein');
     if (!this.#balances.has(account)) this.#balances.set(account, ZERO_VC);
+  }
+
+  /** Verbindlichkeitskonto: darf negativ stehen, damit eine Schuld gebucht statt gekappt wird. */
+  openLiability(account: AccountId): void {
+    if (!account.trim()) throw new LedgerError('Konto darf nicht leer sein');
+    this.#liabilities.add(account);
+    this.openAccount(account);
   }
 
   hasAccount(account: AccountId): boolean {
@@ -111,7 +119,7 @@ export class Ledger {
     this.openAccount(to);
 
     const available = this.#balances.get(from) ?? ZERO_VC;
-    if (!isMintingAccount(from) && !canAfford(available, amount)) {
+    if (!isMintingAccount(from) && !this.#liabilities.has(from) && !canAfford(available, amount)) {
       throw new InsufficientFundsError(from, amount, available, reason);
     }
 
@@ -143,13 +151,13 @@ export class Ledger {
       const from = (replay.get(entry.from) ?? 0) - entry.amount;
       const to = (replay.get(entry.to) ?? 0) + entry.amount;
       if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to)) return false;
-      if (!isMintingAccount(entry.from) && from < 0) return false;
+      if (!isMintingAccount(entry.from) && !this.#liabilities.has(entry.from) && from < 0) return false;
       replay.set(entry.from, from as VaCoinMicro);
       replay.set(entry.to, to as VaCoinMicro);
     }
     let net = 0;
     for (const [account, balance] of this.#balances) {
-      if (!isMintingAccount(account) && balance < 0) return false;
+      if (!isMintingAccount(account) && !this.#liabilities.has(account) && balance < 0) return false;
       if ((replay.get(account) ?? ZERO_VC) !== balance) return false;
       net += balance;
     }

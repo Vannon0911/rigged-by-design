@@ -5,7 +5,7 @@ import { playRound } from '../games/round';
 import type { Prng } from '../rng/prng';
 import { clamp, releaseAndChoose } from './guest-core';
 import { chooseActivity } from './guest-choice';
-import { guestAccount, HAUSKONTO, placeBet, SHOP, winToPending } from './money';
+import { guestAccount, HAUSKONTO, payOut, placeBet, SHOP } from './money';
 import { modEffects } from './offers';
 import { getPersona } from './personas';
 import type { Furniture, Guest, WorldState } from './types';
@@ -32,10 +32,9 @@ function playSpin(world: WorldState, ledger: Ledger, prng: Prng, guest: Guest, i
   }
   let bps = result.multiplierBps;
   if (bps > 0 && item.mods.includes('CHERRY')) bps += 120;
-  const gross = bps > 0 ? mulVC(bet, bps) : ZERO_VC;
-  const house = ledger.getBalance(HAUSKONTO);
-  const payout = Math.min(gross, house) as VaCoinMicro;
-  if (payout > ZERO_VC) winToPending(ledger, guest.id, payout, world.tick);
+  const payout = bps > 0 ? mulVC(bet, bps) : ZERO_VC;
+  // Volle Auszahlung: fehlende Deckung wird als Schuld gebucht, nie still gekappt.
+  if (payout > ZERO_VC) payOut(ledger, guest.id, payout, world.tick);
   if (effects.operating > ZERO_VC) {
     try { ledger.transfer(HAUSKONTO, SHOP, effects.operating, 'mod betrieb', world.tick); } catch { /* Konto reicht nicht */ }
   }

@@ -4,20 +4,24 @@ import { ZERO_VC, type VaCoinMicro } from '../economy/vacoin';
 import type { Prng } from '../rng/prng';
 import { dirtyNear } from './emotion';
 import { actAtTarget, becomeAngry, chooseActivity, moveGuest, payAndLeave, releaseAndChoose } from './guests';
-import { admitFiat, exchangeToVc, guestAccount, HAUSKONTO, pendingAccount, STAFF, UTILITIES } from './money';
+import { exchangeFiat, guestAccount, HAUSKONTO, pendingAccount, STAFF, UTILITIES } from './money';
 import { spawnChance, spawnGuest } from './spawn';
 import type { Guest, WorldState } from './types';
 import { exchangePoint, furnitureById, sendGuest } from './world';
 
 const CASHIER_WAIT = 12;
 
+/** Wechselt nur, wenn die Buchung vollstaendig gelingt; sonst bleibt das Fiat auf dem Gastkonto. */
 function arriveAtDesk(world: WorldState, ledger: Ledger, prng: Prng, guest: Guest): boolean {
   if (guest.queueIndex > 0) return false;
   try {
-    admitFiat(ledger, guest.id, guest.fiat, world.tick);
-    exchangeToVc(ledger, guest.id, guest.fiat, world.tick);
-  } catch { /* Kasse geschlossen */ }
-  guest.fiat = ZERO_VC;
+    exchangeFiat(ledger, guest.id, world.tick);
+  } catch {
+    guest.patience = Math.max(0, guest.patience - 2);
+    world.lastEvent = `${guest.name} wartet an der Kasse.`;
+    if (guest.patience === 0) payAndLeave(world, ledger, guest);
+    return false;
+  }
   chooseActivity(world, guest, ledger, prng);
   return true;
 }
@@ -157,7 +161,7 @@ function decay(world: WorldState): void {
 
 export function tickWorld(world: WorldState, ledger: Ledger, prng: Prng): void {
   world.tick += 1;
-  if (prng.nextFloat() < spawnChance(world)) spawnGuest(world, prng);
+  if (prng.nextFloat() < spawnChance(world)) spawnGuest(world, prng, ledger);
   exchangeQueue(world);
   for (const guest of [...world.guests]) {
     if (!world.guests.includes(guest)) continue;

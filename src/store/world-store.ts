@@ -5,11 +5,12 @@ import { fromVC, toVCString, ZERO_VC, type VaCoinMicro } from '../core/economy/v
 import type { RoundResult } from '../core/games/round';
 import {
   build, cleanAll, cleanTile, fire, foreignRound, hire, installMod, movePlayer,
-  payGuest, repair, serveDrink, setBaseBet, setCarpet, setPrice, settleGuests, takeDrink, testSpin, upgradeReels,
+  payGuest, repair, serveDrink, setBaseBet, setCarpet, setPrice, takeDrink, testSpin, upgradeReels,
 } from '../core/sim/actions';
 import { HAUSKONTO, HOUSE_FLOAT, playerTakeHome } from '../core/sim/money';
 import type { BuildId } from '../core/sim/offers';
-import { createWorld, ensureStarter, TEMPLATE_COST } from '../core/sim/templates';
+import { remodel } from '../core/sim/remodel';
+import { createWorld, ensureStarter } from '../core/sim/templates';
 import { tickWorld } from '../core/sim/tick';
 import type { CarpetId, GameId, ModId, Point, TemplateId, WorldState } from '../core/sim/types';
 import { Prng } from '../core/rng/prng';
@@ -71,16 +72,11 @@ class WorldStore {
 
   setTemplate(template: TemplateId): void {
     if (template === this.#world.template) return;
-    const cost = TEMPLATE_COST[template];
     try {
-      if (cost > ZERO_VC) this.#ledger.transfer(HAUSKONTO, 'SHOP', cost, `umbau ${template}`, this.#world.tick);
-      settleGuests(this.#world, this.#ledger);
-      const carpet = this.#world.carpet;
-      this.#world = createWorld(template, carpet);
-      ensureStarter(this.#world);
+      this.#world = remodel(this.#world, this.#ledger, template, this.#world.tick);
       this.#notice = `${template === 'SMALL' ? 'Kleine' : template === 'MEDIUM' ? 'Mittlere' : 'Große'} Bude eröffnet.`;
-    } catch {
-      this.#notice = 'Das Hauskonto deckt diesen Umbau nicht.';
+    } catch (error) {
+      this.#notice = error instanceof Error ? error.message : 'Umbau fehlgeschlagen.';
     }
     this.#emit();
   }

@@ -44,7 +44,6 @@ export function makeGuest(input: {
   id: number;
   persona: PersonaId;
   prng: Prng;
-  fiat: VaCoinMicro;
   spawn: Point;
 }): Guest {
   const persona = getPersona(input.persona);
@@ -53,7 +52,6 @@ export function makeGuest(input: {
     id: input.id,
     name: `${NAMES[input.prng.nextInt(0, NAMES.length - 1)]!} ${LAST_NAMES[input.prng.nextInt(0, LAST_NAMES.length - 1)]!}`,
     persona: persona.id,
-    fiat: input.fiat,
     mood,
     patience,
     addiction,

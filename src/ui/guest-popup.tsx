@@ -26,7 +26,7 @@ export function GuestPopup({ view, selectedId, onClose, onPay, onServe }: Props)
   const emotion = guest ? emotionOf(guest, spotted) : 'NONE';
   const meta = EMOTION_META[emotion];
   const stateLabel = guest ? STATE_LABEL[guest.state] ?? guest.state : '';
-  const money = guest ? view.guestMoney[guest.id] ?? { wallet: 0, pending: 0 } : { wallet: 0, pending: 0 };
+  const money = guest ? view.guestMoney[guest.id] ?? { wallet: 0, pending: 0, fiat: 0 } : { wallet: 0, pending: 0, fiat: 0 };
   return (
     <PopupShell eyebrow="LIVE AM FLOOR" title="Gäste" onClose={onClose} wide>
       <div className="cashier-strip">
@@ -47,8 +47,8 @@ export function GuestPopup({ view, selectedId, onClose, onPay, onServe }: Props)
             </div>
             <div className="guest-budget-big">
               <span>BUDGET</span>
-              <strong>{vc(money.wallet + money.pending + guest.fiat, 2)}</strong>
-              <small>{money.pending > 0 ? `${vc(money.pending, 2)} Gewinn wartet` : guest.fiat > 0 ? `${vc(guest.fiat, 2)} Fiat` : 'in Chips'}</small>
+              <strong>{vc(money.wallet + money.pending + money.fiat, 2)}</strong>
+              <small>{money.pending > 0 ? `${vc(money.pending, 2)} Gewinn wartet` : money.fiat > 0 ? `${vc(money.fiat, 2)} Fiat` : 'in Chips'}</small>
             </div>
           </div>
           <div className="guest-bars">
@@ -62,13 +62,13 @@ export function GuestPopup({ view, selectedId, onClose, onPay, onServe }: Props)
           </div>
           <div className="guest-chips">
             {guests.map((entry) => {
-              const entryMoney = view.guestMoney[entry.id] ?? { wallet: 0, pending: 0 };
+              const entryMoney = view.guestMoney[entry.id] ?? { wallet: 0, pending: 0, fiat: 0 };
               const entryMeta = EMOTION_META[emotionOf(entry, dirtyNear(view.dirtyTiles, view.size, entry.position.x, entry.position.y))];
               return (
                 <button key={entry.id} type="button" className={`guest-chip${entry.id === guest.id ? ' active' : ''}`} onClick={() => setActiveId(entry.id)}>
                   <b>{entryMeta.glyph}</b>
                   <span>{entry.name.split(' ')[0]}</span>
-                  <small>{vc(entryMoney.wallet + entryMoney.pending + entry.fiat, 1)}</small>
+                  <small>{vc(entryMoney.wallet + entryMoney.pending + entryMoney.fiat, 1)}</small>
                 </button>
               );
             })}
