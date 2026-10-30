@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Turn-Abschluss: verify:all, deutscher Steam-Notes-Commit, Push nach main. */
+/** Turn-Abschluss: verify:all, deutscher Steam-Notes-Commit, Push auf den Liefer-Zweig. */
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -7,6 +7,13 @@ import { fail, ROOT } from './lib/report.mjs';
 
 const git = (args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
 const TARGET_BRANCH = 'main';
+/** Fork-Betrieb: ein Lesekopie-Remote (origin) und ein Schreib-Remote (fork). */
+function deliveryRemote() {
+  const remotes = git(['remote']).split(/\r?\n/).filter(Boolean);
+  if (remotes.includes('fork')) return 'fork';
+  return process.env.TURN_REMOTE ?? 'origin';
+}
+const DELIVERY_REMOTE = deliveryRemote();
 const verify = spawnSync('npm', ['run', 'verify:all'], { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
 if (verify.status !== 0) {
   fail(1, 'ERR-4006', 'turn:finish', 'verify:all ist rot; kein Commit und kein Push');
@@ -54,7 +61,18 @@ if (gate.status !== 0) {
 }
 
 git(['commit', '-F', messageFile]);
+const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
 console.log(`turn:finish: Commit ${git(['rev-parse', '--short', 'HEAD'])} erstellt`);
+if (DELIVERY_REMOTE === 'fork') {
+  const pushWork = spawnSync('git', ['push', '-u', DELIVERY_REMOTE, `HEAD:${branch}`], { cwd: ROOT, stdio: 'inherit' });
+  if (pushWork.status === 0) {
+    console.log(`turn:finish: PASS, Arbeitsbranch ${branch} am Fork (${DELIVERY_REMOTE}) gepusht`);
+    console.log(`turn:finish: fokussierten PR ${branch} gegen ${TARGET_BRANCH} des Originals (origin) oeffnen`);
+    process.exit(0);
+  }
+  fail(1, 'ERR-4008', 'turn:finish', `Push des Arbeitsbranches auf den Fork ${DELIVERY_REMOTE} scheiterte`);
+  process.exit(1);
+}
 const pushMain = spawnSync('git', ['push', 'origin', `HEAD:${TARGET_BRANCH}`], { cwd: ROOT, stdio: 'inherit' });
 if (pushMain.status === 0) {
   console.log(`turn:finish: PASS, ${TARGET_BRANCH} gepusht`);

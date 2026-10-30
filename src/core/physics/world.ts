@@ -47,6 +47,10 @@ interface PhysicsOptions {
   readonly maxSteps?: number;
 }
 
+/** Magnetwirkung endet nach 6 Einheiten zum Peg-Mittelpunkt; die Zugkraft laeuft aus. */
+const MAGNET_RANGE = 6;
+const MAGNET_ACCEL = 5_400;
+
 /** Fester Zeitschritt, deterministische Reihenfolge: Render-FPS aendert kein Ergebnis. */
 export class PhysicsWorld {
   readonly gravity: Vec2;
@@ -55,6 +59,7 @@ export class PhysicsWorld {
   readonly bodies: Body[] = [];
   readonly #statics: Body[] = [];
   readonly #dynamics: Body[] = [];
+  readonly #magnets: Body[] = [];
   #accumulator = 0;
 
   constructor(options: PhysicsOptions = {}) {
@@ -66,6 +71,7 @@ export class PhysicsWorld {
   add<T extends Body>(body: T): T {
     this.bodies.push(body);
     (body.isStatic ? this.#statics : this.#dynamics).push(body);
+    if (body.isStatic && body.magnet > 0) this.#magnets.push(body);
     return body;
   }
 
@@ -92,6 +98,7 @@ export class PhysicsWorld {
         x: body.velocity.x + this.gravity.x * this.fixedDt,
         y: body.velocity.y + this.gravity.y * this.fixedDt,
       };
+      this.#attract(body);
       body.position = {
         x: body.position.x + body.velocity.x * this.fixedDt,
         y: body.position.y + body.velocity.y * this.fixedDt,
@@ -118,6 +125,20 @@ export class PhysicsWorld {
       if (contact && contact.depth > 0) hits.push(obstacle.trigger);
     }
     return hits;
+  }
+
+  /** Magnet-Peg ziehen in jedem Substep deterministisch zum eigenen Mittelpunkt. */
+  #attract(body: Body): void {
+    if (this.#magnets.length === 0) return;
+    for (const source of this.#magnets) {
+      const dx = source.position.x - body.position.x;
+      const dy = source.position.y - body.position.y;
+      const distanceSq = dx * dx + dy * dy;
+      if (distanceSq >= MAGNET_RANGE * MAGNET_RANGE || distanceSq <= EPS) continue;
+      const distance = Math.sqrt(distanceSq);
+      const pull = MAGNET_ACCEL * source.magnet * (1 - distance / MAGNET_RANGE) * this.fixedDt;
+      body.velocity = { x: body.velocity.x + (dx / distance) * pull, y: body.velocity.y + (dy / distance) * pull };
+    }
   }
 
   #resolve(ball: Body, obstacle: Body): void {

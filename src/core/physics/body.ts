@@ -24,6 +24,8 @@ export interface Body {
   readonly boundingRadius: number;
   /** Federnder Peg: gibt mehr Energie zurueck als ein normales Hindernis. */
   readonly bouncy: boolean;
+  /** Magnetstaerke (>0): zieht naehere Koerper in jedem Substep zum eigenen Mittelpunkt. */
+  readonly magnet: number;
   /** Name der Zone, in der der Koerper als Trigger wirkt (Tasche, Splitter, Tor). */
   readonly trigger: string | null;
 }
@@ -38,6 +40,7 @@ interface BodyOptions {
   readonly friction?: number;
   readonly restitution?: number;
   readonly bouncy?: boolean;
+  readonly magnet?: number;
   readonly trigger?: string;
 }
 
@@ -86,6 +89,8 @@ export function createBody(shape: Shape, options: BodyOptions = {}): Body {
   if (!Number.isFinite(mass) || mass < 0) throw new Error(`Physik: Masse ${String(mass)} ist ungueltig`);
   assertFinite(options.position?.x ?? 0, 'position.x');
   assertFinite(options.position?.y ?? 0, 'position.y');
+  assertFinite(options.magnet ?? 0, 'magnet');
+  if ((options.magnet ?? 0) < 0) throw new Error('Physik: Magnetstaerke darf nicht negativ sein');
   const inertia = inertiaOf(shape, mass);
   return {
     id: nextId++,
@@ -103,6 +108,7 @@ export function createBody(shape: Shape, options: BodyOptions = {}): Body {
     isStatic,
     boundingRadius,
     bouncy: options.bouncy ?? false,
+    magnet: options.magnet ?? 0,
     trigger: options.trigger ?? null,
   };
 }
