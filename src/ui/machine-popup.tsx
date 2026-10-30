@@ -4,6 +4,7 @@ import type { GameResult } from '../core/games/contracts';
 import { MODS, attractionValue, getMod } from '../core/sim/offers';
 import type { Furniture, ModId } from '../core/sim/types';
 import type { GameView } from '../store/types';
+import { BoardEditor } from './board-editor';
 import { vc } from './format';
 import { PopupShell } from './popup-shell';
 
@@ -77,7 +78,7 @@ export function MachinePopup({ item, view, onClose, onTest, onRepair, onMod, onA
         <div className="decor-info">
           <p>{item.kind === 'DECOR' ? 'Deko macht den Raum einladender. Gäste bleiben lieber.' : 'Servicepunkt für Gäste. Hält den Laden am Laufen.'}</p>
           <div className="machine-stats">
-            <Stat label="ZUSTAND" value={item.damaged ? 'DEFEKT' : `${Math.round(item.condition)}%`} bad={item.damaged || item.condition < 45} />
+            <Stat label="ZUSTADO" value={item.damaged ? 'DEFEKT' : `${Math.round(item.condition)}%`} bad={item.damaged || item.condition < 45} />
             <Stat label="PLÄTZE" value={`${item.occupants.length}/${item.seats}`} />
           </div>
           <button type="button" className="btn" onClick={onRepair} disabled={(item.condition >= 100 && !item.damaged) || view.house < view.prices.repairCost}>REPARIEREN · {vc(view.prices.repairCost, 0)}</button>
@@ -105,6 +106,7 @@ export function MachinePopup({ item, view, onClose, onTest, onRepair, onMod, onA
             })}
           </div>
           <p className="hint">Verbaute Mods: {item.mods.length ? item.mods.map((id) => getMod(id).name).join(' · ') : 'keine'}</p>
+          {item.gameId === 'PLINKO' && <BoardEditor />}
         </>
       )}
     </PopupShell>
