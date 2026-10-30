@@ -20,7 +20,7 @@ const view = {
   carpet: world.carpet,
   zones: world.zones,
   furniture: [],
-  dirtyTiles: Array.from({ length: 500 }, (_, index) => (index * 37) % (world.size * world.size)),
+  dirtyTiles: new Set(Array.from({ length: 500 }, (_, index) => (index * 37) % (world.size * world.size))),
 };
 const rect = visibleRect(0, 0, 0.2, 1600, 900);
 

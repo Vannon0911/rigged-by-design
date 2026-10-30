@@ -17,7 +17,7 @@ function worldSnapshot(world: WorldState) {
     guests: world.guests.map((guest) => ({ ...guest, path: [...guest.path] })),
     capacity: serviceCapacity(world),
     player: { ...world.player, position: { ...world.player.position }, path: [...world.player.path] },
-    dirtyTiles: [...world.dirty],
+    dirtyTiles: new Set(world.dirty),
     tick: world.tick,
     day: world.day,
     staff: { ...world.staff },
@@ -59,7 +59,7 @@ export function buildView(world: WorldState, ledger: Ledger, notice: string): Ga
     guestMoney,
     mood: world.guests.length ? Math.round(mood / world.guests.length) : 0,
     reputation: Math.round(reputation(world)),
-    ledgerOk: ledger.verifyLedgerIntegrity(),
+    ledgerOk: ledger.verifyIncremental(),
     notice,
   };
 }

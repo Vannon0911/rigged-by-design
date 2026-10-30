@@ -10,7 +10,7 @@ export interface GameView {
   readonly guests: readonly Guest[];
   readonly capacity: number;
   readonly player: Player;
-  readonly dirtyTiles: readonly number[];
+  readonly dirtyTiles: ReadonlySet<number>;
   readonly tick: number;
   readonly day: number;
   readonly staff: StaffState;

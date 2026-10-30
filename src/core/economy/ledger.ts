@@ -4,24 +4,12 @@
  * ausserhalb einer Buchung gegen EXTERNAL_WORLD.
  */
 import { addVC, canAfford, subVC, toVCString, ZERO_VC, type VaCoinMicro } from './vacoin';
+import {
+  applyEntry, BASE_ACCOUNTS, isMintingAccount, MINTING_ACCOUNT, verifyBalanceSheet,
+  type AccountId, type LedgerEntry,
+} from './ledger-integrity';
 
-const BASE_ACCOUNTS = [
-  'EXTERNAL_WORLD',
-  'WECHSELKASSE',
-  'HAUSKONTO',
-  'PORTEMONNAIE',
-  'SHOP',
-  'STAFF',
-  'UTILITIES',
-] as const;
-
-export type AccountId = string;
-
-const MINTING_ACCOUNT = 'EXTERNAL_WORLD';
-
-function isMintingAccount(account: AccountId): boolean {
-  return account === MINTING_ACCOUNT;
-}
+export type { AccountId } from './ledger-integrity';
 
 class LedgerError extends Error {
   constructor(message: string) {
@@ -45,20 +33,16 @@ export class InsufficientFundsError extends LedgerError {
   }
 }
 
-interface LedgerEntry {
-  readonly seq: number;
-  readonly tick: number;
-  readonly from: AccountId;
-  readonly to: AccountId;
-  readonly amount: VaCoinMicro;
-  readonly reason: string;
-}
-
 export class Ledger {
   readonly #balances = new Map<AccountId, VaCoinMicro>();
   readonly #liabilities = new Set<AccountId>();
   readonly #entries: LedgerEntry[] = [];
   #seq = 0;
+  /** Seit der letzten Pruefung beruehrte Konten: nur die muessen neu verglichen werden. */
+  readonly #touched = new Set<AccountId>();
+  /** Aus Buchungen abgeleiteter Stand bis #replaySeq; nie aus #balances gesetzt. */
+  #replay: Map<AccountId, VaCoinMicro> | null = null;
+  #replaySeq = 0;
 
   constructor(opening?: Readonly<Record<AccountId, VaCoinMicro>>) {
     for (const account of BASE_ACCOUNTS) this.#balances.set(account, ZERO_VC);
@@ -136,31 +120,68 @@ export class Ledger {
     });
     this.#seq += 1;
     this.#entries.push(entry);
+    this.#touched.add(from);
+    this.#touched.add(to);
     return entry;
   }
 
+  /**
+   * Vollstaendige Pruefung fuer Audit, Tests und Laden: replay gegen alle Konten.
+   * Ab dem zweiten Lauf nur noch ab dem letzten Checkpoint statt ueber die ganze Historie.
+   */
   verifyLedgerIntegrity(): boolean {
-    const replay = new Map<AccountId, VaCoinMicro>();
-    for (const account of BASE_ACCOUNTS) replay.set(account, ZERO_VC);
-    for (const entry of this.#entries) {
-      if (!Number.isSafeInteger(entry.amount) || entry.amount <= 0) return false;
-      if (entry.from === entry.to) return false;
-      for (const account of [entry.from, entry.to]) {
-        if (!replay.has(account)) replay.set(account, ZERO_VC);
+    const replay = this.#replayFromCheckpoint();
+    if (!replay) return this.#dropCheckpoint();
+    for (let index = this.#replaySeq; index < this.#entries.length; index += 1) {
+      if (!applyEntry(replay, this.#entries[index]!, this.#liabilities)) return this.#dropCheckpoint();
+    }
+    if (!verifyBalanceSheet(replay, this.#balances, this.#liabilities)) return this.#dropCheckpoint();
+    this.#advance(replay);
+    return true;
+  }
+
+  /**
+   * Tickpfad: nur neue Buchungen und die zuletzt beruehrten Konten.
+   * Der teure Vollvergleich bleibt bei verifyLedgerIntegrity().
+   */
+  verifyIncremental(): boolean {
+    if (this.#seq !== this.#entries.length) return false;
+    const last = this.#entries[this.#entries.length - 1];
+    if (last !== undefined && last.seq !== this.#seq - 1) return false;
+    const replay = this.#replayFromCheckpoint();
+    if (!replay) return this.verifyLedgerIntegrity();
+    for (let index = this.#replaySeq; index < this.#entries.length; index += 1) {
+      if (!applyEntry(replay, this.#entries[index]!, this.#liabilities)) return this.#dropCheckpoint();
+    }
+    for (const account of this.#touched) {
+      if ((replay.get(account) ?? ZERO_VC) !== (this.#balances.get(account) ?? ZERO_VC)) {
+        return this.#dropCheckpoint();
       }
-      const from = (replay.get(entry.from) ?? 0) - entry.amount;
-      const to = (replay.get(entry.to) ?? 0) + entry.amount;
-      if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to)) return false;
-      if (!isMintingAccount(entry.from) && !this.#liabilities.has(entry.from) && from < 0) return false;
-      replay.set(entry.from, from as VaCoinMicro);
-      replay.set(entry.to, to as VaCoinMicro);
     }
-    let net = 0;
-    for (const [account, balance] of this.#balances) {
-      if (!isMintingAccount(account) && !this.#liabilities.has(account) && balance < 0) return false;
-      if ((replay.get(account) ?? ZERO_VC) !== balance) return false;
-      net += balance;
-    }
-    return net === 0;
+    this.#advance(replay);
+    return true;
+  }
+
+  #replayFromCheckpoint(): Map<AccountId, VaCoinMicro> {
+    if (this.#replay) return this.#replay;
+    const fresh = new Map<AccountId, VaCoinMicro>();
+    for (const account of BASE_ACCOUNTS) fresh.set(account, ZERO_VC);
+    this.#replay = fresh;
+    this.#replaySeq = 0;
+    return fresh;
+  }
+
+  #advance(replay: Map<AccountId, VaCoinMicro>): void {
+    this.#replay = replay;
+    this.#replaySeq = this.#entries.length;
+    this.#touched.clear();
+  }
+
+  /** Ein gebrochener Stand verliert seinen Checkpoint; der naechste Lauf replayt wieder alles. */
+  #dropCheckpoint(): boolean {
+    this.#replay = null;
+    this.#replaySeq = 0;
+    this.#touched.clear();
+    return false;
   }
 }

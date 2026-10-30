@@ -19,7 +19,7 @@ const MOOD_LABEL = (mood: number): string => (mood >= 65 ? 'gut' : mood >= 40 ? 
 
 export function Hud({ view, onBuild, onGuests, onVisit, onClean, onOverview, onSkill }: HudProps) {
   const rpg = view.player.rpg;
-  const dirty = view.dirtyTiles.length;
+  const dirty = view.dirtyTiles.size;
   const startTip = view.house === 0 && view.guests.length === 0;
   const mood = view.guests.length ? view.mood : 0;
   return (

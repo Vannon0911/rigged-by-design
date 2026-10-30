@@ -22,14 +22,14 @@ export const EMOTION_META: Readonly<Record<GuestEmotion, EmotionMeta>> = {
   NONE: { label: 'entspannt', glyph: '', tone: 'none' },
 };
 
-/** Dreck in der Nähe färbt die Stimmung; billiger Nachbarschaftstest auf dem Set. */
-export function dirtyNear(tiles: readonly number[], size: number, x: number, y: number, radius = 2): boolean {
+/** Dreck in der Nähe färbt die Stimmung; direkte Mitgliedschaft statt Suche im Array. */
+export function dirtyNear(tiles: ReadonlySet<number>, size: number, x: number, y: number, radius = 2): boolean {
   for (let dy = -radius; dy <= radius; dy += 1) {
     for (let dx = -radius; dx <= radius; dx += 1) {
       const tx = x + dx;
       const ty = y + dy;
       if (tx < 0 || ty < 0 || tx >= size || ty >= size) continue;
-      if (tiles.includes(ty * size + tx)) return true;
+      if (tiles.has(ty * size + tx)) return true;
     }
   }
   return false;

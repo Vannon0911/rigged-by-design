@@ -125,8 +125,8 @@ export function BuildPanel(props: Props) {
 
         <h3>Betrieb</h3>
         <div className="ops-row">
-          <button type="button" className="btn" onClick={props.onClean} disabled={view.dirtyTiles.length === 0 || view.house < view.prices.cleaningCost * view.dirtyTiles.length}>
-            PUTZEN {view.dirtyTiles.length > 0 ? `(${view.dirtyTiles.length}) · ${vc(view.prices.cleaningCost * view.dirtyTiles.length, 2)}` : ''}
+          <button type="button" className="btn" onClick={props.onClean} disabled={view.dirtyTiles.size === 0 || view.house < view.prices.cleaningCost * view.dirtyTiles.size}>
+            PUTZEN {view.dirtyTiles.size > 0 ? `(${view.dirtyTiles.size}) · ${vc(view.prices.cleaningCost * view.dirtyTiles.size, 2)}` : ''}
           </button>
           {broken.map((item) => (
             <button key={item.id} type="button" className="btn repair" onClick={() => props.onRepair(item.id)} disabled={view.house < view.prices.repairCost || view.parts <= 0}>

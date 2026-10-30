@@ -64,7 +64,7 @@ Jede Laufzeit- und Entwicklungabhängigkeit braucht eine nicht-leere Begründung
 | typescript | ^5.7.3 | Build | Strikte Typpruefung mit noUncheckedIndexedAccess und ungenutzten Symbolen. | 1: `tsconfig.json` |
 | typescript-eslint | ^8.72.1 | Lint | TypeScript-Parser und Regeln fuer das Lint-Gate. | 1: `eslint.config.mjs` |
 | vite | ^6.0.7 | Build | Dev-Server und Production-Bundler; liefert die Modul- und CSS-Pipeline. | 1: `package.json` |
-| vitest | ^5.0.5 | Test | Deterministische Unit- und Monte-Carlo-Beweise fuer Ledger, Spiele und Simulation. | 28: `package.json`<br>`src/core/economy/__tests__/economy.test.ts`<br>`src/core/games/__tests__/contracts.test.ts`<br>`src/core/games/__tests__/round.bench.ts`<br>`src/core/games/__tests__/round.test.ts`<br>`src/core/governance/__tests__/dependency-governance.test.ts`<br>… (+22) |
+| vitest | ^5.0.5 | Test | Deterministische Unit- und Monte-Carlo-Beweise fuer Ledger, Spiele und Simulation. | 31: `package.json`<br>`src/core/economy/__tests__/economy.test.ts`<br>`src/core/economy/__tests__/ledger-checkpoint.test.ts`<br>`src/core/games/__tests__/contracts.test.ts`<br>`src/core/games/__tests__/round.bench.ts`<br>`src/core/games/__tests__/round.test.ts`<br>… (+25) |
 <!-- DEP_MATRIX_END -->
 
 ## Delivery-Regel

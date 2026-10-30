@@ -152,7 +152,7 @@ function releaseOrphanSeats(world: WorldState): void {
 }
 
 function decay(world: WorldState): void {
-  const dirty = [...world.dirty];
+  const dirty = world.dirty;
   for (const guest of world.guests) {
     if (guest.state !== 'LEAVE') tickNeeds(world, guest);
     if (guest.state === 'ANGRY') continue;

@@ -25,7 +25,7 @@ function worldWith(slotX: number, slotY: number) {
       carpet: world.carpet,
       zones: world.zones,
       furniture: [{ id: 7, x: slotX, y: slotY, w: 1, h: 1 }],
-      dirtyTiles: [] as readonly number[],
+      dirtyTiles: new Set<number>(),
     },
   };
 }
@@ -42,7 +42,7 @@ describe('Regions-Hash', () => {
 
   it('meldet nur veränderte Regionen', () => {
     const zone = { id: 'gaming', kind: 'GAMING', x: 35, y: 5, w: 10, h: 10, color: 1 };
-    const base = { size: 60, template: 'MEDIUM', carpet: 'VIOLET', zones: [zone], furniture: [], dirtyTiles: [] };
+    const base = { size: 60, template: 'MEDIUM', carpet: 'VIOLET', zones: [zone], furniture: [], dirtyTiles: new Set<number>() };
     const areas = [
       { id: 'area-0', index: 0, x: 0, y: 0, w: 30, h: 30 },
       { id: 'area-1', index: 1, x: 30, y: 0, w: 30, h: 30 },
