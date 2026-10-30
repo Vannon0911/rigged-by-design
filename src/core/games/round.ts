@@ -4,7 +4,7 @@ import type { Prng } from '../rng/prng';
 import { createShoe, type Card } from '../rng/shoe';
 import { buildDistribution, rollNumber } from '../rng/weighted';
 
-export interface RoundResult {
+interface RoundResult {
   readonly game: GameId;
   readonly multiplierBps: number;
   readonly label: string;

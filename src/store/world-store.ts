@@ -2,7 +2,7 @@
 /** Ein Besitzer: Welt, Ledger, PRNG, Uhr und Save. */
 import { Ledger } from '../core/economy/ledger';
 import { fromVC, toVCString, ZERO_VC, type VaCoinMicro } from '../core/economy/vacoin';
-import type { RoundResult } from '../core/games/round';
+import type { GameResult } from '../core/games/contracts';
 import {
   build, cleanAll, cleanTile, fire, foreignRound, hire, installMod, movePlayer,
   payGuest, repair, serveDrink, setBaseBet, setCarpet, setPrice, takeDrink, testSpin, upgradeReels,
@@ -19,7 +19,6 @@ import { clearOldSave, loadWorld, saveWorld } from './save';
 import type { GameView } from './types';
 
 const TICK_MS = 520;
-export interface ForeignResult { readonly payout: VaCoinMicro; readonly label: string; readonly detail: readonly string[]; readonly game: GameId }
 
 class WorldStore {
   #ledger = new Ledger();
@@ -191,7 +190,7 @@ class WorldStore {
     this.#emit(false);
   }
 
-  playForeign(game: GameId, betVC: number, houseEdgeBps = 250): ForeignResult | null {
+  playForeign(game: GameId, betVC: number, houseEdgeBps = 250): GameResult | null {
     try {
       const result = foreignRound(this.#ledger, game, fromVC(betVC), this.#prng, this.#world.tick, houseEdgeBps);
       this.#notice = result.payout > 0
@@ -206,7 +205,7 @@ class WorldStore {
     }
   }
 
-  spinTest(itemId: number): RoundResult | null {
+  spinTest(itemId: number): GameResult | null {
     const item = this.#world.furniture.find((entry) => entry.id === itemId);
     if (!item) return null;
     return testSpin(item, this.#prng);

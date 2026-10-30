@@ -1,7 +1,7 @@
 /** Commands, die nicht im Tick passieren: Spieler, Bauen, Preise, Personal, fremde Spiele. */
 import type { Ledger } from '../economy/ledger';
 import { fromVC, ZERO_VC, type VaCoinMicro } from '../economy/vacoin';
-import { playRound, type RoundResult } from '../games/round';
+import { playAction, type GameResult } from '../games/contracts';
 import type { Prng } from '../rng/prng';
 import { closeFiat, exchangeFromVc, foreignBet, foreignWin, guestAccount, HAUSKONTO, payPending, PORTEMONNAIE, SHOP, STAFF } from './money';
 import { getBuildDef, getMod, type BuildId } from './offers';
@@ -155,8 +155,8 @@ export function setBaseBet(world: WorldState, itemId: number, bet: VaCoinMicro):
   item.baseBet = bet;
 }
 
-export function testSpin(item: Furniture, prng: Prng): RoundResult {
-  return playRound(item.gameId ?? 'SLOT', prng);
+export function testSpin(item: Furniture, prng: Prng): GameResult {
+  return playAction({ game: item.gameId ?? 'SLOT', stake: ZERO_VC }, prng);
 }
 
 export function foreignRound(
@@ -166,12 +166,10 @@ export function foreignRound(
   prng: Prng,
   tick: number,
   houseEdgeBps = 250,
-): { payout: VaCoinMicro; label: string; detail: readonly string[]; game: GameId } {
+): GameResult {
   if (ledger.getBalance(PORTEMONNAIE) < bet) throw new Error('Nicht genug Bargeld. Hebe am Hauskonto ab.');
   foreignBet(ledger, bet, tick);
-  const result = playRound(game, prng);
-  const adjusted = Math.max(0, result.multiplierBps - (result.multiplierBps > 0 ? houseEdgeBps : 0));
-  const payout = Math.round((bet * adjusted) / 10_000) as VaCoinMicro;
-  if (payout > 0) foreignWin(ledger, payout, tick);
-  return { payout, label: result.label, detail: result.detail, game };
+  const result = playAction({ game, stake: bet, houseEdgeBps }, prng);
+  if (result.payout > 0) foreignWin(ledger, result.payout, tick);
+  return result;
 }

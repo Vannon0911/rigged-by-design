@@ -66,32 +66,34 @@ interface ModDef {
   readonly patience: number;
   readonly addiction: number;
   readonly operating: VaCoinMicro;
+  /** Aufschlag auf gewonnene Runden, fliesst in den Spiel-Vertrag. */
+  readonly bonusBps: number;
 }
 
 export const MODS: readonly ModDef[] = [
   {
     id: 'NEON', name: 'Neon-Rahmen', description: 'Leuchtet bis zur Straße. +Anziehung, +Geduld.',
-    cost: fromVC(6), attraction: 260, patience: 3, addiction: 1, operating: fromVC(0.01),
+    cost: fromVC(6), attraction: 260, patience: 3, addiction: 1, operating: fromVC(0.01), bonusBps: 0,
   },
   {
     id: 'CHERRY', name: 'Kirschen-Flut', description: 'Mehr kleine Treffer. Fühlt sich nach Gewinn an, kostet Geduld.',
-    cost: fromVC(8), attraction: 160, patience: -2, addiction: 4, operating: fromVC(0),
+    cost: fromVC(8), attraction: 160, patience: -2, addiction: 4, operating: fromVC(0), bonusBps: 120,
   },
   {
     id: 'NEAR_MISS', name: 'Fast-Gewinn-Magnet', description: 'Nieten sehen aus wie Jackpots. Zieht stark, macht ungeduldig.',
-    cost: fromVC(12), attraction: 320, patience: -7, addiction: 6, operating: fromVC(0),
+    cost: fromVC(12), attraction: 320, patience: -7, addiction: 6, operating: fromVC(0), bonusBps: 0,
   },
   {
     id: 'FREE_DRINK', name: 'Freier Fusel', description: 'Ein Drink pro Spin. Gäste halten länger, du zahlst Betrieb.',
-    cost: fromVC(10), attraction: 140, patience: 8, addiction: 2, operating: fromVC(0.03),
+    cost: fromVC(10), attraction: 140, patience: 8, addiction: 2, operating: fromVC(0.03), bonusBps: 0,
   },
   {
     id: 'EXTRA_REEL', name: 'Vierte Walze', description: 'Mehr Kombinationen, mehr Schauwert. Nur für Slots.',
-    cost: fromVC(18), attraction: 300, patience: -3, addiction: 3, operating: fromVC(0),
+    cost: fromVC(18), attraction: 300, patience: -3, addiction: 3, operating: fromVC(0), bonusBps: 0,
   },
   {
     id: 'VELVET', name: 'Samtverkleidung', description: 'Fühlt sich teuer an. Bessere Gäste, weniger Geduld.',
-    cost: fromVC(14), attraction: 220, patience: -2, addiction: 1, operating: fromVC(0.02),
+    cost: fromVC(14), attraction: 220, patience: -2, addiction: 1, operating: fromVC(0.02), bonusBps: 0,
   },
 ];
 
@@ -102,19 +104,23 @@ export function getMod(id: ModId): ModDef {
   return mod;
 }
 
-export function modEffects(item: Furniture): { attraction: number; patience: number; addiction: number; operating: VaCoinMicro } {
+export function modEffects(item: Furniture): {
+  attraction: number; patience: number; addiction: number; operating: VaCoinMicro; bonusBps: number;
+} {
   let attraction = 0;
   let patience = 0;
   let addiction = 0;
   let operating = 0;
+  let bonusBps = 0;
   for (const id of item.mods) {
     const mod = getMod(id);
     attraction += mod.attraction;
     patience += mod.patience;
     addiction += mod.addiction;
     operating += mod.operating;
+    bonusBps += mod.bonusBps;
   }
-  return { attraction, patience, addiction, operating: operating as VaCoinMicro };
+  return { attraction, patience, addiction, operating: operating as VaCoinMicro, bonusBps };
 }
 
 /** Zusatzwalzen erhoehen den Schauwert und damit den Zulauf. */

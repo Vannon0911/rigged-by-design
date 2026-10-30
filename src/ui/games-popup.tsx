@@ -3,14 +3,14 @@ import { useState } from 'react';
 import { HOUSE_FLOAT } from '../core/sim/money';
 import type { GameId } from '../core/sim/types';
 import type { GameView } from '../store/types';
-import type { ForeignResult } from '../store/world-store';
+import type { GameResult } from '../core/games/contracts';
 import { vc } from './format';
 import { PopupShell } from './popup-shell';
 
 interface Props {
   readonly view: GameView;
   readonly onClose: () => void;
-  readonly onPlay: (game: GameId, bet: number, edge: number) => ForeignResult | null;
+  readonly onPlay: (game: GameId, bet: number, edge: number) => GameResult | null;
   readonly onTakeHome: () => void;
 }
 
@@ -38,7 +38,7 @@ export function GamesPopup({ view, onClose, onPlay, onTakeHome }: Props) {
   const [bet, setBet] = useState(0.5);
   const [full, setFull] = useState(false);
   const [spinning, setSpinning] = useState(false);
-  const [result, setResult] = useState<ForeignResult | null>(null);
+  const [result, setResult] = useState<GameResult | null>(null);
   const selected = GAMES.find((entry) => entry.id === game)!;
   const cannotPay = view.wallet < bet * 10_000;
 

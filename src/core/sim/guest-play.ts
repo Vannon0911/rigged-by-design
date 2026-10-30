@@ -1,7 +1,7 @@
 /** Spielen, Trinken, Klo: jeder Aufruf endet in einer konkreten Aktion, nicht in Zahlenrauschen. */
 import type { Ledger } from '../economy/ledger';
-import { canAfford, mulVC, ZERO_VC, type VaCoinMicro } from '../economy/vacoin';
-import { playRound } from '../games/round';
+import { canAfford, ZERO_VC, type VaCoinMicro } from '../economy/vacoin';
+import { playAction } from '../games/contracts';
 import type { Prng } from '../rng/prng';
 import { clamp, releaseAndChoose } from './guest-core';
 import { chooseActivity } from './guest-choice';
@@ -20,8 +20,8 @@ function playSpin(world: WorldState, ledger: Ledger, prng: Prng, guest: Guest, i
     guest.stateTicks = 0;
     return;
   }
-  const result = playRound(item.gameId ?? 'SLOT', prng);
   const effects = modEffects(item);
+  const result = playAction({ game: item.gameId ?? 'SLOT', stake: bet, bonusBps: effects.bonusBps }, prng);
   try {
     placeBet(ledger, guest.id, bet, world.tick);
   } catch {
@@ -30,9 +30,7 @@ function playSpin(world: WorldState, ledger: Ledger, prng: Prng, guest: Guest, i
     guest.stateTicks = 0;
     return;
   }
-  let bps = result.multiplierBps;
-  if (bps > 0 && item.mods.includes('CHERRY')) bps += 120;
-  const payout = bps > 0 ? mulVC(bet, bps) : ZERO_VC;
+  const payout = result.payout;
   // Volle Auszahlung: fehlende Deckung wird als Schuld gebucht, nie still gekappt.
   if (payout > ZERO_VC) payOut(ledger, guest.id, payout, world.tick);
   if (effects.operating > ZERO_VC) {
@@ -40,7 +38,7 @@ function playSpin(world: WorldState, ledger: Ledger, prng: Prng, guest: Guest, i
   }
   const netWin = payout > bet;
   const push = payout === bet;
-  const jackpot = payout > ZERO_VC && bps >= 10_000;
+  const jackpot = payout > ZERO_VC && result.multiplierBps >= 10_000;
   guest.lastResult = jackpot ? 'JACKPOT!' : payout > ZERO_VC || !item.mods.includes('NEAR_MISS') ? result.label : 'FAST!';
   guest.mood = clamp(guest.mood + (netWin ? 8 : push ? 0 : -2) + (effects.patience > 0 ? 1 : 0));
   guest.patience = clamp(guest.patience - 1 + effects.patience);

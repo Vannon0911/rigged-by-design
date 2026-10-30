@@ -1,6 +1,6 @@
 /** Automaten-Popup: Zustand, Mods, Walzen und ein kostenloser Testspin. */
 import { useState } from 'react';
-import type { RoundResult } from '../core/games/round';
+import type { GameResult } from '../core/games/contracts';
 import { MODS, attractionValue, getMod } from '../core/sim/offers';
 import type { Furniture, ModId } from '../core/sim/types';
 import type { GameView } from '../store/types';
@@ -11,7 +11,7 @@ interface Props {
   readonly item: Furniture;
   readonly view: GameView;
   readonly onClose: () => void;
-  readonly onTest: () => RoundResult | null;
+  readonly onTest: () => GameResult | null;
   readonly onRepair: () => void;
   readonly onMod: (id: ModId) => void;
   readonly onAddReel: () => void;
@@ -27,7 +27,7 @@ const GAME_LABEL: Record<string, string> = {
 export function MachinePopup({ item, view, onClose, onTest, onRepair, onMod, onAddReel, onBet, onTakeDrink }: Props) {
   const [spinning, setSpinning] = useState(false);
   const [full, setFull] = useState(false);
-  const [result, setResult] = useState<RoundResult | null>(null);
+  const [result, setResult] = useState<GameResult | null>(null);
   const isGame = Boolean(item.gameId);
   const spin = (): void => {
     if (spinning || !isGame) return;
