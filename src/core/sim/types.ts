@@ -6,7 +6,7 @@ import type { PlayerRpgState } from './player-rpg';
 export type StaffRole = 'guard' | 'cleaner' | 'bartender' | 'cashier' | 'porter';
 
 export type TemplateId = 'SMALL' | 'MEDIUM' | 'LARGE';
-type ZoneKind = 'ENTRANCE' | 'EXCHANGE' | 'GAMING' | 'BAR' | 'TOILET' | 'STORAGE' | 'LOUNGE';
+type ZoneKind = 'ENTRANCE' | 'EXCHANGE' | 'GAMING' | 'BAR' | 'TOILET' | 'STORAGE' | 'LOUNGE' | 'EXPANSION';
 export type GameId = 'SLOT' | 'BLACKJACK' | 'POKER' | 'ROULETTE' | 'PLINKO' | 'SHELL' | 'DICE';
 type GuestState = 'ENTER' | 'EXCHANGE' | 'CHOOSE' | 'WAIT' | 'PLAY' | 'DRINK' | 'TOILET' | 'CASHOUT' | 'LEAVE' | 'ANGRY';
 type Need = 'play' | 'drink' | 'toilet' | 'social';

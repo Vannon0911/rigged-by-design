@@ -3,7 +3,7 @@
 import { Ledger } from '../core/economy/ledger';
 import { fromVC, toVCString, ZERO_VC, type VaCoinMicro } from '../core/economy/vacoin';
 import type { GameResult } from '../core/games/contracts';
-import { cleanAll, cleanTile, foreignRound, installMod, repair, setBaseBet, setCarpet, setPrice, testSpin, upgradeReels } from '../core/sim/actions';
+import { cleanAll, cleanTile, installMod, repair, setBaseBet, setCarpet, setPrice, testSpin, upgradeReels } from '../core/sim/actions';
 import { payGuest } from '../core/sim/service-actions';
 import { deployHeldCrate, movePlayer, pickupCrate, serveDesk, serveDrink, setNeonColor, setWallColor, storeHeldCrate, takeDrink, upgradeBar, upgradeWc } from '../core/sim/player';
 import { buyCrate, orderDrinks, orderParts } from '../core/sim/deliveries';
@@ -15,6 +15,8 @@ import { HAUSKONTO, HOUSE_FLOAT, playerTakeHome } from '../core/sim/money';
 import { fireAgent, hireAgent } from '../core/sim/staff';
 import type { BuildId } from '../core/sim/offers';
 import { remodel } from '../core/sim/remodel';
+import type { RivalId } from '../core/sim/rivals';
+import { playForeignGame, playRivalGame, type ForeignOutcome } from './foreign-play';
 import { createWorld, ensureStarter } from '../core/sim/templates';
 import { tickWorld } from '../core/sim/tick';
 import type { CarpetId, GameId, ModId, Point, StaffRole, TemplateId, WorldState } from '../core/sim/types';
@@ -78,7 +80,7 @@ class WorldStore {
     if (template === this.#world.template) return;
     try {
       this.#world = remodel(this.#world, this.#ledger, template, this.#world.tick);
-      this.#notice = `${template === 'SMALL' ? 'Kleine' : template === 'MEDIUM' ? 'Mittlere' : 'Große'} Bude eröffnet.`;
+      this.#notice = this.#world.lastEvent;
     } catch (error) {
       this.#notice = error instanceof Error ? error.message : 'Umbau fehlgeschlagen.';
     }
@@ -86,38 +88,23 @@ class WorldStore {
   }
 
   buy(id: BuildId): void {
-    this.#guard(() => {
-      buyCrate(this.#world, this.#ledger, id);
-      this.#notice = this.#world.lastEvent;
-    });
+    this.#event(() => buyCrate(this.#world, this.#ledger, id));
   }
 
   orderDrinks(count: number): void {
-    this.#guard(() => {
-      orderDrinks(this.#world, this.#ledger, count);
-      this.#notice = this.#world.lastEvent;
-    });
+    this.#event(() => orderDrinks(this.#world, this.#ledger, count));
   }
 
   orderParts(count: number): void {
-    this.#guard(() => {
-      orderParts(this.#world, this.#ledger, count);
-      this.#notice = this.#world.lastEvent;
-    });
+    this.#event(() => orderParts(this.#world, this.#ledger, count));
   }
 
   pickup(crateId: number): void {
-    this.#guard(() => {
-      pickupCrate(this.#world, crateId);
-      this.#notice = this.#world.lastEvent;
-    });
+    this.#event(() => pickupCrate(this.#world, crateId));
   }
 
   deploy(x: number, y: number): void {
-    this.#guard(() => {
-      deployHeldCrate(this.#world, x, y);
-      this.#notice = this.#world.lastEvent;
-    });
+    this.#event(() => deployHeldCrate(this.#world, x, y));
   }
 
   unloadHere(): void {
@@ -276,17 +263,11 @@ class WorldStore {
   }
 
   takeDrink(): void {
-    this.#guard(() => {
-      takeDrink(this.#world);
-      this.#notice = this.#world.lastEvent;
-    });
+    this.#event(() => takeDrink(this.#world));
   }
 
   serveDrink(guestId: number): void {
-    this.#guard(() => {
-      serveDrink(this.#world, this.#ledger, guestId);
-      this.#notice = this.#world.lastEvent;
-    });
+    this.#event(() => serveDrink(this.#world, this.#ledger, guestId));
   }
 
   moveTo(point: Point): void {
@@ -295,16 +276,23 @@ class WorldStore {
   }
 
   playForeign(game: GameId, betVC: number, houseEdgeBps = 250): GameResult | null {
+    return this.#foreign(() => playForeignGame(this.#ledger, game, betVC, this.#prng, this.#world.tick, houseEdgeBps));
+  }
+
+  playRival(rivalId: RivalId, machineIndex: number, betVC: number): GameResult | null {
+    return this.#foreign(() => playRivalGame(this.#ledger, rivalId, machineIndex, betVC, this.#prng, this.#world.tick));
+  }
+
+  /** Ein Pfad fuer alle fremden Haeuser: gleiche Notiz, gleiche Fehlerbehandlung. */
+  #foreign(run: () => ForeignOutcome): GameResult | null {
     try {
-      const result = foreignRound(this.#ledger, game, fromVC(betVC), this.#prng, this.#world.tick, houseEdgeBps);
-      this.#notice = result.payout > 0
-        ? `${result.label}: ${toVCString(result.payout)} zurück.`
-        : `${result.label}. ${toVCString(fromVC(betVC))} verloren.`;
+      const { result, notice } = run();
+      this.#notice = notice;
       this.#emit();
       return result;
     } catch (error) {
       this.#notice = error instanceof Error ? error.message : 'Fremdes Spiel fehlgeschlagen.';
-      this.#emit();
+      this.#emit(false);
       return null;
     }
   }
@@ -325,6 +313,14 @@ class WorldStore {
     this.#savedTick += 1;
     this.#emit(this.#savedTick % 6 === 0);
   };
+
+  /** Wie #guard, uebernimmt aber die Ereignismeldung der Welt. */
+  #event(run: () => void): void {
+    this.#guard(() => {
+      run();
+      this.#notice = this.#world.lastEvent;
+    });
+  }
 
   #guard(action: () => void): void {
     try {

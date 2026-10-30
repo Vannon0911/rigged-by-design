@@ -1,4 +1,5 @@
 /** Bau-Sektionen: Personal, Hauswahl, Farben, Kisten, Streit. Reine Darstellung. */
+import { expansionCost, isExpansion } from '../core/sim/expansions';
 import { remodelRequirements } from '../core/sim/remodel';
 import type { StaffRole, TemplateId } from '../core/sim/types';
 import type { GameView } from '../store/types';
@@ -15,10 +16,10 @@ function Staff(props: { label: string; note: string; wage: number; on: boolean; 
   );
 }
 
-const TEMPLATES: readonly { id: TemplateId; name: string; note: string; cost: number }[] = [
-  { id: 'SMALL', name: 'Kleine Bude', note: '1 Saal, 1 Automat, alles überschaubar.', cost: 30 },
-  { id: 'MEDIUM', name: 'Mittleres Haus', note: 'Mehr Tische, Bar, Klo, Platz für Personal.', cost: 120 },
-  { id: 'LARGE', name: 'Großes Casino', note: 'Alle Spiele, Deko, Personal, volle Fläche.', cost: 600 },
+const TEMPLATES: readonly { id: TemplateId; name: string; note: string }[] = [
+  { id: 'SMALL', name: 'Kleine Bude', note: '1 Saal, 1 Automat, alles überschaubar.' },
+  { id: 'MEDIUM', name: 'Mittleres Haus', note: 'Mehr Tische, Bar, Klo, Platz für Personal.' },
+  { id: 'LARGE', name: 'Großes Casino', note: 'Alle Spiele, Deko, Personal, volle Fläche.' },
 ];
 
 export function TemplateGrid(props: { view: GameView; onTemplate: (id: TemplateId) => void }) {
@@ -26,21 +27,25 @@ export function TemplateGrid(props: { view: GameView; onTemplate: (id: TemplateI
   return (
     <div className="template-grid">
       {TEMPLATES.map((template) => {
-        const req = remodelRequirements(template.id);
+        const current = view.template === template.id;
+        // Ausbau kostet nur die Differenz; ein kleineres Haus ist kein Ausbau.
+        const expandable = isExpansion(view.template, template.id);
+        const cost = expansionCost(view.template, template.id);
+        const req = expandable ? remodelRequirements(template.id) : null;
         const locked = req !== null
           && (view.day < req.day || view.reputation < req.reputation || view.guestsServed < req.served);
         return (
           <button
             key={template.id}
             type="button"
-            className={`template-card${view.template === template.id ? ' active' : ''}`}
+            className={`template-card${current ? ' active' : ''}`}
             onClick={() => props.onTemplate(template.id)}
-            disabled={view.template === template.id || view.house < template.cost * 10_000 || locked}
+            disabled={current || !expandable || view.house < cost || locked}
           >
             <strong>{template.name}</strong>
             <span>{template.note}</span>
             {req && <small>braucht Tag {req.day}, Ruf {req.reputation}, {req.served} Gäste</small>}
-            <b>{vc(template.cost * 10_000, 0)}</b>
+            <b>{current ? 'aktuell' : expandable ? `Ausbau ${vc(cost, 0)}` : 'kein Ausbau'}</b>
           </button>
         );
       })}

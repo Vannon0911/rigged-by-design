@@ -4,6 +4,7 @@ import type { VaCoinMicro } from '../economy/vacoin';
 import { clamp } from './guest-core';
 import { HAUSKONTO, SHOP } from './money';
 import { getBuildDef, type BuildId } from './offers';
+import { assertUnlocked } from './progression';
 import type { Crate, CratePayload, Furniture, Guest, WorldState } from './types';
 import { canPlace, furnitureById } from './world';
 
@@ -43,6 +44,7 @@ function orderCrate(world: WorldState, ledger: Ledger, payload: CratePayload, co
 
 /** Ein Möbelkauf landet als Kiste im Eingang statt auf dem Floor. */
 export function buyCrate(world: WorldState, ledger: Ledger, buildId: BuildId): Crate {
+  assertUnlocked(world, ledger, buildId);
   const def = getBuildDef(buildId);
   return orderCrate(world, ledger, { kind: 'FURNITURE', buildId }, def.cost, `kauf ${def.name}`);
 }

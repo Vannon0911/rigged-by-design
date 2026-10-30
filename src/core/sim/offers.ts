@@ -104,7 +104,7 @@ export function getMod(id: ModId): ModDef {
   return mod;
 }
 
-export function modEffects(item: Furniture): {
+export function modEffects(item: { readonly mods: readonly ModId[] }): {
   attraction: number; patience: number; addiction: number; operating: VaCoinMicro; bonusBps: number;
 } {
   let attraction = 0;

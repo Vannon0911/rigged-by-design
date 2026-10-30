@@ -53,7 +53,7 @@ describe('Abrechnung', () => {
 });
 
 describe('Umbau', () => {
-  it('laesst beim Template-Wechsel kein verwaistes Konto und kein Restgeld zurueck', () => {
+  it('laesst beim Ausbau Gast, Chips und offenen Gewinn unangetastet', () => {
     const { world, ledger, guest } = fundedGuest();
     ledger.transfer('EXTERNAL_WORLD', HAUSKONTO, fromVC(200), 'baukapital', 0);
     world.day = 4;
@@ -62,24 +62,24 @@ describe('Umbau', () => {
     const before = ledger.getBalance(HAUSKONTO);
     const next = remodel(world, ledger, 'MEDIUM', 5);
     expect(next.template).toBe('MEDIUM');
-    expect(ledger.getBalance(HAUSKONTO)).toBe(before - fromVC(120));
-    expect(ledger.getBalance(guestAccount(guest.id))).toBe(0);
-    expect(ledger.getBalance(pendingAccount(guest.id))).toBe(0);
-    expect(ledger.getBalance(fiatAccount(guest.id))).toBe(0);
+    // Nur die Differenz SMALL->MEDIUM wird gebucht, nicht der volle Neubaupreis.
+    expect(ledger.getBalance(HAUSKONTO)).toBe(before - fromVC(90));
+    expect(next.guests.some((entry) => entry.id === guest.id)).toBe(true);
+    expect(ledger.getBalance(guestAccount(guest.id))).toBe(fromVC(5));
+    expect(ledger.getBalance(pendingAccount(guest.id))).toBe(fromVC(2));
+    expect(ledger.getBalance(fiatAccount(guest.id))).toBeGreaterThan(0);
     expect(ledger.verifyLedgerIntegrity()).toBe(true);
   });
 
-  it('bricht den Umbau ab, wenn die Abrechnung scheitert, und laesst das Hauskonto unberuehrt', () => {
+  it('bricht den Ausbau bei Unterdeckung ab und laesst Welt und Hauskonto unberuehrt', () => {
     const { world, ledger, guest } = fundedGuest();
-    ledger.transfer('EXTERNAL_WORLD', HAUSKONTO, fromVC(200), 'baukapital', 0);
     world.day = 4;
     world.reputation = 40;
     world.guestsServed = 30;
     const before = ledger.getBalance(HAUSKONTO);
-    const spy = vi.spyOn(ledger, 'transfer').mockImplementation(() => { throw new Error('Kasse klemmt'); });
     expect(() => remodel(world, ledger, 'MEDIUM', 5)).toThrow();
-    spy.mockRestore();
     expect(world.template).toBe('SMALL');
+    expect(world.size).toBe(30);
     expect(world.guests.some((entry) => entry.id === guest.id)).toBe(true);
     expect(ledger.getBalance(HAUSKONTO)).toBe(before);
     expect(ledger.verifyLedgerIntegrity()).toBe(true);
