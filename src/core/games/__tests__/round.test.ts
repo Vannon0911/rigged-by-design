@@ -13,6 +13,16 @@ import { playRound } from '../round';
 
 const GAMES: readonly GameId[] = ['SLOT', 'BLACKJACK', 'POKER', 'ROULETTE', 'PLINKO', 'SHELL', 'DICE'];
 
+/**
+ * Plinko laeuft durch echte Physik: deterministisch, aber rund tausendmal teurer
+ * pro Runde. Die Stichprobe bleibt gross genug, dass die RTP-Schaetzung nicht am
+ * Bandrand kippt.
+ */
+const ROUNDS: Readonly<Record<GameId, number>> = {
+  SLOT: 500_000, BLACKJACK: 500_000, POKER: 500_000, ROULETTE: 500_000,
+  SHELL: 500_000, DICE: 500_000, PLINKO: 8_000,
+};
+
 describe('Spiele', () => {
   it('jedes Spiel liefert eine gueltige, deterministische Runde', () => {
     for (const game of GAMES) {
@@ -28,8 +38,8 @@ describe('Spiele', () => {
   });
 
   it('jedes Spiel zahlt 90-96 % aus und erzeugt sichtbare Gewinner und Verlierer', { timeout: 180_000 }, () => {
-    const rounds = 500_000;
     for (const game of GAMES) {
+      const rounds = ROUNDS[game];
       const prng = new Prng(0x51ca5e + game.length);
       let returned = 0;
       let winners = 0;

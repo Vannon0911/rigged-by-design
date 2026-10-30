@@ -3,6 +3,7 @@ import type { GameId } from '../sim/types';
 import type { Prng } from '../rng/prng';
 import { createShoe, type Card } from '../rng/shoe';
 import { buildDistribution, rollNumber } from '../rng/weighted';
+import { createPlinkoBoard, PLINKO_POCKETS } from './plinko-board';
 
 interface RoundResult {
   readonly game: GameId;
@@ -24,7 +25,6 @@ const SLOT_TRIPLE_BPS: Readonly<Record<string, number>> = {
 /** Alle Spiele ziehen ueber denselben Vertrag; die Chance kommt aus derselben Verteilung. */
 const SLOT_REEL = buildDistribution(0, SLOT_SYMBOLS.length - 1);
 const ROULETTE_NUMBER = buildDistribution(0, 36);
-const COIN_FLIP = buildDistribution(0, 1);
 const SHELL_POSITION = buildDistribution(0, 2);
 const DIE = buildDistribution(1, 6);
 
@@ -97,16 +97,18 @@ function roulette(prng: Prng): RoundResult {
   return { game: 'ROULETTE', multiplierBps: bps, label, detail: [`${number}`, red ? 'rot' : 'schwarz', 'Satz: Rot'] };
 }
 
+/** Paytable auf die gemessene Fachverteilung des Boards geeicht. */
+const PLINKO_PAYOUT_BPS = [23_000, 26_000, 10_500, 0, 0, 0, 10_500, 26_000, 60_000] as const;
+const plinkoBoard = createPlinkoBoard();
+
 function plinko(prng: Prng): RoundResult {
-  let slot = 0;
-  for (let row = 0; row < 8; row += 1) slot += rollNumber(prng, COIN_FLIP).value;
-  const table = [200_000, 40_000, 14_500, 4_000, 2_000, 4_000, 14_500, 40_000, 200_000];
-  const bps = table[slot] ?? 0;
+  const drop = plinkoBoard.drop(prng);
+  const bps = PLINKO_PAYOUT_BPS[drop.pocket] ?? 0;
   return {
     game: 'PLINKO',
     multiplierBps: bps,
-    label: `Fach ${slot + 1} - ${multiplier(bps)}`,
-    detail: ['●', ...Array.from({ length: 8 }, (_, i) => (i <= slot ? '╲' : '╱'))],
+    label: `Fach ${drop.pocket + 1} - ${multiplier(bps)}`,
+    detail: ['●', `${drop.pocket + 1}/${PLINKO_POCKETS}`, `${drop.steps} Schritte`],
   };
 }
 
