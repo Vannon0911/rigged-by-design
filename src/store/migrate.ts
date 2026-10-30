@@ -1,0 +1,129 @@
+/** Hydration und Migration gespeicherter Stände (v5/v6/v7) in eine frische Welt. */
+import { ZERO_VC, type VaCoinMicro } from '../core/economy/vacoin';
+import { GAME_FOOTPRINT, SERVICE_FOOTPRINT } from '../core/sim/grid-zones';
+import { reputation } from '../core/sim/spawn';
+import type { CarpetId, Crate, Dispute, Furniture, Guest, Player, PriceBook, StaffAgent, StaffState, TemplateId, WorldState } from '../core/sim/types';
+
+export interface SavedEntry {
+  readonly tick: number;
+  readonly from: string;
+  readonly to: string;
+  readonly amount: VaCoinMicro;
+  readonly reason: string;
+}
+
+/** v5-Gaeste konnten noch ein Fiat-Feld tragen; ab v6 liegt es im Ledger. */
+export type SavedGuest = Guest & { readonly fiat?: VaCoinMicro };
+
+export interface SavedGame {
+  readonly version: 5 | 6 | 7;
+  readonly template: TemplateId;
+  readonly carpet: CarpetId;
+  readonly furniture: Furniture[];
+  readonly guests: SavedGuest[];
+  readonly player: Player;
+  readonly dirty: number[];
+  readonly prices: PriceBook;
+  readonly staff: StaffState;
+  readonly tick: number;
+  readonly day: number;
+  readonly nextGuestId: number;
+  readonly nextFurnitureId: number;
+  readonly guardsHired: number;
+  readonly crates?: Crate[];
+  readonly agents?: StaffAgent[];
+  readonly disputes?: Dispute[];
+  readonly parts?: number;
+  readonly guestsServed?: number;
+  readonly reputation?: number;
+  readonly wallColor?: string;
+  readonly neonColor?: string;
+  readonly barLevel?: number;
+  readonly wcLevel?: number;
+  readonly nextCrateId?: number;
+  readonly nextAgentId?: number;
+  readonly nextDisputeId?: number;
+  readonly lastEvent: string;
+  readonly entries: readonly SavedEntry[];
+  readonly prngState: number;
+}
+
+function footprintOf(item: Furniture): { w: number; h: number; seats: number } | null {
+  if (item.gameId) return GAME_FOOTPRINT[item.gameId] ?? null;
+  if (item.kind === 'EXCHANGE' || item.kind === 'BAR' || item.kind === 'TOILET' || item.kind === 'STORAGE') {
+    return SERVICE_FOOTPRINT[item.kind];
+  }
+  return null;
+}
+
+/** Füllt alle Felder mit Defaults, heilt verwaiste Referenzen, sammelt altes Fiat. */
+export function hydrateWorld(world: WorldState, saved: SavedGame): Array<{ id: number; amount: VaCoinMicro }> {
+  world.furniture = saved.furniture.map((item) => {
+    const fp = footprintOf(item);
+    return {
+      ...item,
+      w: fp?.w ?? item.w, h: fp?.h ?? item.h, seats: fp?.seats ?? item.seats,
+      damaged: item.damaged ?? false,
+      stock: item.stock ?? (item.kind === 'BAR' ? 4 : 0),
+      clog: item.clog ?? 0,
+      clogged: item.clogged ?? false,
+      occupants: [...(item.occupants ?? [])],
+      mods: [...(item.mods ?? [])],
+      reels: item.reels ?? 3,
+    };
+  });
+  const legacyFiat: { id: number; amount: VaCoinMicro }[] = [];
+  world.guests = saved.guests.map((guest) => {
+    const { fiat, ...rest } = guest;
+    if (fiat && fiat > ZERO_VC) legacyFiat.push({ id: guest.id, amount: fiat });
+    return {
+      ...rest,
+      thirst: rest.thirst ?? 20,
+      bladder: rest.bladder ?? 10,
+      disputeId: rest.disputeId ?? null,
+      path: [...(guest.path ?? [])],
+    };
+  });
+  world.player = { ...world.player, ...saved.player, path: [...(saved.player?.path ?? [])] };
+  world.dirty = new Set(saved.dirty ?? []);
+  world.prices = { ...world.prices, ...(saved.prices ?? {}) };
+  world.staff = { ...world.staff, ...(saved.staff ?? {}) };
+  world.tick = saved.tick ?? 0;
+  world.day = saved.day ?? 1;
+  world.nextGuestId = saved.nextGuestId ?? 1;
+  world.nextFurnitureId = saved.nextFurnitureId ?? 100;
+  world.guardsHired = saved.guardsHired ?? 0;
+  world.crates = (saved.crates ?? []).map((crate) => ({ ...crate, carriedBy: crate.carriedBy ?? null }));
+  world.agents = (saved.agents ?? []).map((agent) => ({
+    ...agent, path: [...(agent.path ?? [])], carryingCrate: agent.carryingCrate ?? null,
+  }));
+  world.disputes = (saved.disputes ?? []).map((dispute) => ({ ...dispute, guestIds: [...dispute.guestIds] }));
+  world.parts = saved.parts ?? 2;
+  world.guestsServed = saved.guestsServed ?? 0;
+  world.reputation = saved.reputation ?? reputation(world);
+  world.wallColor = saved.wallColor ?? '#241a35';
+  world.neonColor = saved.neonColor ?? '#00ffcc';
+  world.barLevel = saved.barLevel ?? 1;
+  world.wcLevel = saved.wcLevel ?? 1;
+  world.nextCrateId = saved.nextCrateId ?? world.crates.reduce((max, crate) => Math.max(max, crate.id + 1), 1);
+  world.nextAgentId = saved.nextAgentId ?? world.agents.reduce((max, agent) => Math.max(max, agent.id + 1), 1);
+  world.nextDisputeId = saved.nextDisputeId ?? world.disputes.reduce((max, dispute) => Math.max(max, dispute.id + 1), 1);
+  const agentIds = new Set(world.agents.map((agent) => agent.id));
+  for (const crate of world.crates) {
+    if (typeof crate.carriedBy === 'number' && !agentIds.has(crate.carriedBy)) crate.carriedBy = null;
+  }
+  const crateIds = new Set(world.crates.map((crate) => crate.id));
+  for (const agent of world.agents) {
+    if (agent.carryingCrate !== null && !crateIds.has(agent.carryingCrate)) agent.carryingCrate = null;
+  }
+  const guestIds = new Set(world.guests.map((guest) => guest.id));
+  for (const dispute of world.disputes) dispute.guestIds = dispute.guestIds.filter((id) => guestIds.has(id));
+  world.disputes = world.disputes.filter((dispute) => dispute.guestIds.length >= 2);
+  for (const guest of world.guests) {
+    if (guest.disputeId !== null && !world.disputes.some((dispute) => dispute.id === guest.disputeId)) {
+      guest.disputeId = null;
+    }
+  }
+  world.lastEvent = saved.lastEvent ?? 'Spielstand geladen.';
+  return legacyFiat;
+}

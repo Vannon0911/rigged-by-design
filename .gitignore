@@ -7,5 +7,6 @@ artifacts/
 .env.local
 .DS_Store
 docs/Chats/
+.rtk/
 .turn-notes.md
 .git/TURN_COMMIT_MSG

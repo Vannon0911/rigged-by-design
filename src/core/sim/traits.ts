@@ -7,21 +7,15 @@ import type { Guest, PersonaId, Point, TemplateId } from './types';
 
 const NAMES = ['Kai', 'Rita', 'Bruno', 'Nadja', 'Otis', 'Mira', 'Falk', 'Sina', 'Timo', 'Lena', 'Emil', 'Jule', 'Mika'];
 const LAST_NAMES = ['Vogt', 'Berger', 'Kern', 'Roth', 'Adler', 'Busch', 'Dorn', 'Fink', 'Held', 'Kraus'];
-const POOL = 200;
+import { rollProfile } from './needs';
 const TIER: Record<TemplateId, 1 | 2 | 3> = { SMALL: 1, MEDIUM: 2, LARGE: 3 };
 const PERSONA_WEIGHT: Record<PersonaId, number> = {
   LUMPEN: 4, STREET: 4, BUSINESS: 2, HIGH_ROLLER: 1, STAMMGAST: 3,
 };
 
-/** Verteilt exakt 200 Punkte auf die drei Kernwerte; jeder bleibt in 0..100. */
-function splitPool(prng: Prng): [number, number, number] {
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    const mood = prng.nextInt(0, 100);
-    const patience = prng.nextInt(0, 100);
-    const addiction = POOL - mood - patience;
-    if (addiction >= 0 && addiction <= 100) return [mood, patience, addiction];
-  }
-  return [70, 70, 60];
+/** Ein 180-Punkte-Max-Pool; die Persona verschiebt den Suchtanteil. */
+function splitPool(prng: Prng, persona: PersonaId): [number, number, number] {
+  return rollProfile(prng, getPersona(persona).addictionRate);
 }
 
 export function randomPersona(prng: Prng, template: TemplateId): PersonaId {
@@ -43,7 +37,7 @@ export function makeGuest(input: {
   spawn: Point;
 }): Guest {
   const persona = getPersona(input.persona);
-  const [mood, patience, addiction] = splitPool(input.prng);
+  const [mood, patience, addiction] = splitPool(input.prng, input.persona);
   return {
     id: input.id,
     name: `${NAMES[input.prng.nextInt(0, NAMES.length - 1)]!} ${LAST_NAMES[input.prng.nextInt(0, LAST_NAMES.length - 1)]!}`,
@@ -52,6 +46,9 @@ export function makeGuest(input: {
     patience,
     addiction,
     sociability: input.prng.nextInt(30, 100),
+    thirst: 10 + input.prng.nextInt(0, 20),
+    bladder: input.prng.nextInt(0, 25),
+    disputeId: null,
     state: 'ENTER',
     stateTicks: 0,
     position: { ...input.spawn },

@@ -1,5 +1,8 @@
 /** Ein einziger serialisierbarer Weltzustand. Geld liegt nicht hier, sondern im Ledger. */
 import type { VaCoinMicro } from '../economy/vacoin';
+import type { BuildId } from './offers';
+
+export type StaffRole = 'guard' | 'cleaner' | 'bartender' | 'cashier' | 'porter';
 
 export type TemplateId = 'SMALL' | 'MEDIUM' | 'LARGE';
 type ZoneKind = 'ENTRANCE' | 'EXCHANGE' | 'GAMING' | 'BAR' | 'TOILET' | 'STORAGE' | 'LOUNGE';
@@ -38,6 +41,9 @@ export interface Furniture {
   condition: number;
   damaged: boolean;
   dirt: number;
+  stock: number;
+  clog: number;
+  clogged: boolean;
   readonly zoneId: string;
   occupants: number[];
   mods: ModId[];
@@ -53,6 +59,9 @@ export interface Guest {
   patience: number;
   addiction: number;
   sociability: number;
+  thirst: number;
+  bladder: number;
+  disputeId: number | null;
   state: GuestState;
   stateTicks: number;
   position: Point;
@@ -81,14 +90,55 @@ export interface PriceBook {
   slotMinBet: VaCoinMicro;
   staffWage: VaCoinMicro;
   guardWage: VaCoinMicro;
+  cashierWage: VaCoinMicro;
+  porterWage: VaCoinMicro;
   cleaningCost: VaCoinMicro;
   repairCost: VaCoinMicro;
+  partCost: VaCoinMicro;
+  drinkCrateCost: VaCoinMicro;
+  barUpgrade: VaCoinMicro;
+  wcUpgrade: VaCoinMicro;
 }
 
 export interface StaffState {
   guard: boolean;
   cleaner: boolean;
   bartender: boolean;
+  cashier: boolean;
+  porter: boolean;
+}
+
+export type CratePayload =
+  | { kind: 'FURNITURE'; buildId: BuildId }
+  | { kind: 'DRINKS'; count: number }
+  | { kind: 'PARTS'; count: number };
+
+export interface Crate {
+  id: number;
+  payload: CratePayload;
+  x: number;
+  y: number;
+  carriedBy: number | 'player' | null;
+}
+
+export interface StaffAgent {
+  id: number;
+  role: StaffRole;
+  x: number;
+  y: number;
+  path: Point[];
+  pathIndex: number;
+  carryingCrate: number | null;
+  workTicks: number;
+}
+
+export interface Dispute {
+  id: number;
+  guestIds: number[];
+  x: number;
+  y: number;
+  level: number;
+  ticks: number;
 }
 
 export interface WorldState {
@@ -108,6 +158,19 @@ export interface WorldState {
   nextFurnitureId: number;
   lastEvent: string;
   guardsHired: number;
+  crates: Crate[];
+  agents: StaffAgent[];
+  disputes: Dispute[];
+  parts: number;
+  guestsServed: number;
+  reputation: number;
+  wallColor: string;
+  neonColor: string;
+  barLevel: number;
+  wcLevel: number;
+  nextCrateId: number;
+  nextAgentId: number;
+  nextDisputeId: number;
 }
 
 export const TILE = 26;

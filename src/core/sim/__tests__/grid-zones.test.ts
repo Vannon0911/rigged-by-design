@@ -14,7 +14,8 @@ const TEMPLATES: readonly TemplateId[] = ['SMALL', 'MEDIUM', 'LARGE'];
 
 const block = (id: number, x: number, y: number): Furniture => ({
   id, kind: 'DECOR', x, y, w: 1, h: 1, seats: 0, label: 'block', price: 0 as VaCoinMicro,
-  quality: 1, condition: 100, damaged: false, dirt: 0, zoneId: 'lounge', occupants: [], mods: [], reels: 0, baseBet: 0 as VaCoinMicro,
+  quality: 1, condition: 100, damaged: false, dirt: 0, stock: 0, clog: 0, clogged: false,
+  zoneId: 'lounge', occupants: [], mods: [], reels: 0, baseBet: 0 as VaCoinMicro,
 });
 
 describe('30x30-Bereiche und Multi-Tile', () => {

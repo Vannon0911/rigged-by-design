@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { Ledger } from '../../economy/ledger';
 import { fromVC, toVCString } from '../../economy/vacoin';
 import { Prng } from '../../rng/prng';
-import { build, repair, serveDrink, settleGuests, takeDrink } from '../actions';
+import { repair, serveDrink, settleGuests, takeDrink } from '../actions';
+import { buyCrate, deployCrate, takeCrate } from '../deliveries';
 import { chooseActivity, payAndLeave } from '../guests';
 import { fiatAccount, guestAccount, HAUSKONTO, pendingAccount } from '../money';
 import { attractionValue, getBuildDef, MODS, offerScore } from '../offers';
@@ -32,7 +33,6 @@ describe('Welt und Startzustand', () => {
       expect(world.furniture.some((item) => item.kind === kind)).toBe(true);
     }
   });
-
   it('verteilt 200 Punkte auf Laune, Geduld und Sucht', () => {
     const prng = new Prng(99);
     for (let index = 0; index < 40; index += 1) {
@@ -44,7 +44,7 @@ describe('Welt und Startzustand', () => {
         expect(value).toBeGreaterThanOrEqual(0);
         expect(value).toBeLessThanOrEqual(100);
       }
-      expect(guest.mood + guest.patience + guest.addiction).toBe(200);
+      expect(guest.mood + guest.patience + guest.addiction).toBe(180);
       expect(guest.sociability).toBeGreaterThanOrEqual(30);
       expect(guest.sociability).toBeLessThanOrEqual(100);
     }
@@ -105,14 +105,16 @@ describe('Geld und Umbau', () => {
     expect(slot.damaged).toBe(false);
     expect(ledger.getBalance(HAUSKONTO)).toBe(fromVC(100) - world.prices.repairCost);
   });
-  it('baut nur mit Deckung und zieht den Preis vom Hauskonto ab', () => {
+  it('kauft als Kiste und stellt erst nach dem Aufstellen auf', () => {
     const { world, ledger } = setup();
     ledger.transfer('EXTERNAL_WORLD', HAUSKONTO, fromVC(100), 'startguthaben fuer test', 0);
     const before = ledger.getBalance(HAUSKONTO);
-    const item = build(world, ledger, 'PLANT', 20, 12);
-    expect(item.kind).toBe('DECOR');
+    const crate = buyCrate(world, ledger, 'PLANT');
     expect(ledger.getBalance(HAUSKONTO)).toBe(before - getBuildDef('PLANT').cost);
-    expect(() => build(world, ledger, 'PLANT', 20, 12)).toThrow();
+    expect(deployCrate(world, takeCrate(world, crate.id).id, 20, 12).kind).toBe('DECOR');
+    takeCrate(world, buyCrate(world, ledger, 'PLANT').id);
+    const blocked = world.crates[world.crates.length - 1]!;
+    expect(() => deployCrate(world, blocked.id, 20, 12)).toThrow();
     expect(ledger.verifyLedgerIntegrity()).toBe(true);
   });
   it('laesst beim Umbau keine Gaeste-Guthaben in alten Konten haengen', () => {
@@ -141,7 +143,6 @@ describe('Geld und Umbau', () => {
     expect(guest.mood).toBeGreaterThan(before);
     expect(world.player.carrying).toBe('');
   });
-
   it('laesst Gastgewinne an der Kasse kurz warten, statt sie sofort auszuzahlen', () => {
     const { world, ledger, prng } = setup();
     const guest = spawnGuest(world, prng, ledger)!;
@@ -151,7 +152,6 @@ describe('Geld und Umbau', () => {
     tickWorld(world, ledger, prng);
     expect(guest.state).toBe('CASHOUT'); expect(ledger.getBalance(pendingAccount(guest.id))).toBe(fromVC(1));
   });
-
   it('gibt den Sitz beim Verlassen frei und raeumt verwaiste Reservierungen auf', () => {
     const { world, ledger, prng } = setup();
     const slot = world.furniture.find((item) => item.kind === 'SLOT')!;
@@ -165,7 +165,6 @@ describe('Geld und Umbau', () => {
     tickWorld(world, ledger, prng);
     expect(slot.occupants).toEqual([]);
   });
-
   it('schickt Gaeste ohne Drinkgeld nicht an die Bar', () => {
     const { world, ledger, prng } = setup();
     const guest = spawnGuest(world, prng, ledger)!;
@@ -178,7 +177,6 @@ describe('Geld und Umbau', () => {
     chooseActivity(world, guest, ledger, prng);
     expect(guest.targetFurniture).not.toBe(bar.id);
   });
-
   it('setzt keinen Gast auf einen besetzten Platz', () => {
     const { world, ledger, prng } = setup();
     const slot = world.furniture.find((item) => item.kind === 'SLOT')!;
@@ -188,7 +186,6 @@ describe('Geld und Umbau', () => {
     chooseActivity(world, guest, ledger, prng);
     expect(guest.targetFurniture).not.toBe(slot.id);
   });
-
   it('simuliert viele Ticks ohne negatives Konto und ohne Ledger-Leck', () => {
     const { world, ledger, prng } = setup('MEDIUM');
     for (let step = 0; step < 900; step += 1) tickWorld(world, ledger, prng);

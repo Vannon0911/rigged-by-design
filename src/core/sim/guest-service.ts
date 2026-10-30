@@ -31,6 +31,7 @@ export function payAndLeave(world: WorldState, ledger: Ledger, guest: Guest): vo
     const balance = ledger.getBalance(guestAccount(guest.id));
     if (balance > ZERO_VC) exchangeFromVc(ledger, guest.id, balance, world.tick);
     closeFiat(ledger, guest.id, world.tick);
+    world.guestsServed += 1;
   } catch {
     guest.state = 'CASHOUT';
     guest.stateTicks = 0;

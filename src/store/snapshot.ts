@@ -22,6 +22,15 @@ function worldSnapshot(world: WorldState) {
     prices: { ...world.prices },
     carpet: world.carpet,
     lastEvent: world.lastEvent,
+    crates: world.crates.map((crate) => ({ ...crate })),
+    agents: world.agents.map((agent) => ({ ...agent, path: [...agent.path] })),
+    disputes: world.disputes.map((dispute) => ({ ...dispute, guestIds: [...dispute.guestIds] })),
+    parts: world.parts,
+    guestsServed: world.guestsServed,
+    wallColor: world.wallColor,
+    neonColor: world.neonColor,
+    barLevel: world.barLevel,
+    wcLevel: world.wcLevel,
   };
 }
 

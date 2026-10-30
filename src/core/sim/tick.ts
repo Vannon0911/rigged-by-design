@@ -2,14 +2,16 @@
 import type { Ledger } from '../economy/ledger';
 import { ZERO_VC, type VaCoinMicro } from '../economy/vacoin';
 import type { Prng } from '../rng/prng';
+import { maybeStartBrawl, tickDisputes } from './disputes';
 import { dirtyNear } from './emotion';
 import { actAtTarget, becomeAngry, chooseActivity, moveGuest, payAndLeave, releaseAndChoose } from './guests';
 import { exchangeFiat, guestAccount, HAUSKONTO, pendingAccount, STAFF, UTILITIES } from './money';
-import { spawnChance, spawnGuest } from './spawn';
+import { tickNeeds } from './needs';
+import { spawnChance, spawnGuest, reputation } from './spawn';
+import { CASHIER_WAIT, tickAgents } from './staff';
 import type { Guest, WorldState } from './types';
 import { exchangePoint, furnitureById, sendGuest } from './world';
 
-const CASHIER_WAIT = 12;
 
 /** Wechselt nur, wenn die Buchung vollstaendig gelingt; sonst bleibt das Fiat auf dem Gastkonto. */
 function arriveAtDesk(world: WorldState, ledger: Ledger, prng: Prng, guest: Guest): boolean {
@@ -92,6 +94,10 @@ function guestTick(world: WorldState, ledger: Ledger, prng: Prng, guest: Guest):
     if (!point) { payAndLeave(world, ledger, guest); return; }
     if (guest.path.length === 0) sendGuest(world, guest, point);
     if (!moveGuest(guest)) return;
+    const cashier = world.agents.find((agent) => agent.role === 'cashier');
+    if (cashier && Math.abs(cashier.x - point.x) + Math.abs(cashier.y - point.y) <= 8) {
+      guest.stateTicks = Math.max(guest.stateTicks, CASHIER_WAIT);
+    }
     if (ledger.getBalance(pendingAccount(guest.id)) > ZERO_VC && guest.stateTicks < CASHIER_WAIT) {
       guest.stateTicks += 1;
       guest.patience = Math.max(0, guest.patience - 1);
@@ -120,7 +126,9 @@ function staffTick(world: WorldState, ledger: Ledger): void {
   world.day += 1;
   const wages = ((world.staff.guard ? world.prices.guardWage : 0)
     + (world.staff.cleaner ? world.prices.staffWage : 0)
-    + (world.staff.bartender ? world.prices.staffWage : 0)) as VaCoinMicro;
+    + (world.staff.bartender ? world.prices.staffWage : 0)
+    + (world.staff.cashier ? world.prices.cashierWage : 0)
+    + (world.staff.porter ? world.prices.porterWage : 0)) as VaCoinMicro;
   const rent = (world.prices.cleaningCost * 2) as VaCoinMicro;
   try {
     if (wages > 0) ledger.transfer(HAUSKONTO, STAFF, wages, 'personal', world.tick);
@@ -144,6 +152,7 @@ function releaseOrphanSeats(world: WorldState): void {
 function decay(world: WorldState): void {
   const dirty = [...world.dirty];
   for (const guest of world.guests) {
+    if (guest.state !== 'LEAVE') tickNeeds(world, guest);
     if (guest.state === 'ANGRY') continue;
     const spotted = dirtyNear(dirty, world.size, guest.position.x, guest.position.y, 2);
     if (spotted) {
@@ -167,7 +176,11 @@ export function tickWorld(world: WorldState, ledger: Ledger, prng: Prng): void {
     if (!world.guests.includes(guest)) continue;
     guestTick(world, ledger, prng, guest);
   }
+  maybeStartBrawl(world, prng);
+  tickDisputes(world);
+  tickAgents(world, ledger, prng);
   decay(world);
+  world.reputation = Math.round(reputation(world));
   releaseOrphanSeats(world);
   staffTick(world, ledger);
   if (world.player.pathIndex < world.player.path.length) {

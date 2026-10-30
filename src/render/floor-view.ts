@@ -9,7 +9,9 @@ import { ActorPool } from './actor-pool';
 import { FloorCamera } from './floor-camera';
 import { createFurnitureArt, type FurnitureArt } from './furniture-art';
 import { createGuestArt, type GuestArt } from './guest-art';
-import { createSceneCache, dirtHash, roomHash, type SceneCache } from './scene-cache';
+import { isVisible, screenToTile, visibleRect } from './floor-math';
+import { FloorProps } from './floor-props';
+import { createSceneCache, type SceneCache } from './scene-cache';
 
 const STEP_MS = 520;
 
@@ -25,6 +27,7 @@ export class FloorView {
   readonly #camera = new Container();
   readonly #scene: SceneCache;
   readonly #actors: ActorPool;
+  readonly #props: FloorProps;
   readonly #player: GuestArt;
   readonly #furnitureArt = new Map<number, FurnitureArt>();
   readonly #seenFurniture = new Set<number>();
@@ -32,8 +35,6 @@ export class FloorView {
   readonly #results = new Map<number, string>();
   readonly #cam = new FloorCamera();
   #view: GameView;
-  #roomKey = Number.NaN;
-  #dirtKey = Number.NaN;
   #lod = -1;
   #placing = false;
   #camDirty = true;
@@ -45,13 +46,18 @@ export class FloorView {
     this.#view = view;
     this.#callbacks = callbacks;
     this.#scene = createSceneCache();
-    this.#camera.addChild(this.#scene.room, this.#scene.furniture, this.#scene.actors, this.#scene.stickers);
+    this.#camera.addChild(this.#scene.room, this.#scene.furniture, this.#scene.props, this.#scene.actors, this.#scene.stickers);
     this.#camera.eventMode = 'static';
     this.#camera.on('pointertap', this.#tap);
     app.stage.addChild(this.#camera);
     app.canvas.addEventListener('wheel', this.#wheel, { passive: false });
     this.#actors = new ActorPool(this.#attachActor);
     for (const art of this.#actors.all) this.#attachActor(art);
+    this.#props = new FloorProps(
+      { props: this.#scene.props, actors: this.#scene.actors, stickers: this.#scene.stickers },
+      this.#camera,
+      this.#attachActor,
+    );
     this.#player = createGuestArt('STREET', 'DU', true, 0.4);
     this.#attachActor(this.#player);
     app.ticker.add(this.#animate);
@@ -63,12 +69,8 @@ export class FloorView {
     const previous = this.#view;
     const templateChanged = force || view.size !== previous.size || view.template !== previous.template || view.carpet !== previous.carpet;
     this.#view = view;
-    const nextRoom = roomHash(view);
-    if (nextRoom !== this.#roomKey) {
-      this.#roomKey = nextRoom;
-      this.#scene.redrawRoom(view);
-      this.#scene.setLabels(view, this.#lod === 1);
-    }
+    this.#scene.redrawRoom(view);
+    this.#scene.setLabels(view, this.#lod === 1);
     if (templateChanged) {
       if (view.template !== previous.template || view.size !== previous.size) {
         for (const art of this.#furnitureArt.values()) art.root.destroy({ children: true });
@@ -78,11 +80,7 @@ export class FloorView {
       this.#camera.hitArea = new Rectangle(0, 0, view.size * TILE, view.size * TILE);
       this.#camDirty = true;
     }
-    const nextDirt = dirtHash(view);
-    if (nextDirt !== this.#dirtKey) {
-      this.#dirtKey = nextDirt;
-      this.#scene.redrawDirt(view);
-    }
+    this.#scene.redrawDirt(view);
     this.#syncFurniture(view);
     this.#syncGuests(view);
     this.#syncPlayer(view);
@@ -100,8 +98,9 @@ export class FloorView {
     if (area) this.#cam.zoomToArea(area, this.#view.size);
   }
 
-  setPlacing(placing: boolean): void {
-    this.#placing = placing;
+  setPlacing(buildId: string | null): void {
+    this.#placing = buildId !== null;
+    this.#props.setGhost(buildId);
   }
 
   resize(): void {
@@ -112,17 +111,16 @@ export class FloorView {
 
   cellAt(clientX: number, clientY: number): { x: number; y: number } | null {
     const rect = this.#app.canvas.getBoundingClientRect();
-    if (rect.width === 0) return null;
-    const scale = rect.width / this.#app.screen.width;
-    const x = Math.floor(((clientX - rect.left) / scale - this.#camera.x) / this.#camera.scale.x / TILE);
-    const y = Math.floor(((clientY - rect.top) / scale - this.#camera.y) / this.#camera.scale.y / TILE);
-    if (x < 0 || y < 0 || x >= this.#view.size || y >= this.#view.size) return null;
-    return { x, y };
+    return screenToTile(
+      clientX, clientY, rect, this.#app.screen.width,
+      this.#camera.x, this.#camera.y, this.#camera.scale.x, this.#view.size, TILE,
+    );
   }
 
   destroy(): void {
     this.#destroyed = true;
     this.#app.ticker.remove(this.#animate);
+    this.#props.destroy({ props: this.#scene.props, actors: this.#scene.actors, stickers: this.#scene.stickers });
     this.#app.canvas.removeEventListener('wheel', this.#wheel);
     this.#actors.clear();
     this.#furnitureArt.clear();
@@ -252,27 +250,21 @@ export class FloorView {
       this.#player.sticker.visible = false;
       return;
     }
-    const scale = this.#camera.scale.x;
-    const left = -this.#camera.x / scale;
-    const top = -this.#camera.y / scale;
-    const right = (this.#app.screen.width - this.#camera.x) / scale;
-    const bottom = (this.#app.screen.height - this.#camera.y) / scale;
+    const rect = visibleRect(this.#camera.x, this.#camera.y, this.#camera.scale.x, this.#app.screen.width, this.#app.screen.height);
     for (const item of this.#view.furniture) {
       const art = this.#furnitureArt.get(item.id);
       if (!art) continue;
-      const x = item.x * TILE;
-      const y = item.y * TILE;
-      art.root.visible = x + item.w * TILE >= left && x <= right && y + item.h * TILE >= top && y <= bottom;
+      art.root.visible = isVisible(item.x * TILE, item.y * TILE, item.w * TILE, item.h * TILE, rect, 0);
     }
     for (const art of this.#actors.active.values()) {
-      const visible = art.root.x >= left - 40 && art.root.x <= right + 40 && art.root.y >= top - 40 && art.root.y <= bottom + 40;
+      const visible = isVisible(art.root.x, art.root.y, 0, 0, rect, 40);
       art.root.visible = visible;
       art.sticker.visible = visible;
     }
-    const playerVisible = this.#player.root.x >= left - 40 && this.#player.root.x <= right + 40
-      && this.#player.root.y >= top - 40 && this.#player.root.y <= bottom + 40;
+    const playerVisible = isVisible(this.#player.root.x, this.#player.root.y, 0, 0, rect, 40);
     this.#player.root.visible = playerVisible;
     this.#player.sticker.visible = playerVisible;
+    this.#props.update(this.#view, rect, this.#lod);
   }
 
   #tap = (event: FederatedPointerEvent): void => {
@@ -317,6 +309,7 @@ export class FloorView {
       this.#walk(art, now, Math.sin(now / 280 + art.phase) * 0.3);
     }
     this.#walk(this.#player, now, 0);
+    this.#props.walk(now, STEP_MS);
   };
 
   #walk(art: GuestArt, now: number, bob: number): void {

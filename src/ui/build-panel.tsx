@@ -1,32 +1,42 @@
-/** Bau-Popup: kaufbare Spiele, Deko, Preise, Personal und der Teppich. */
-import { BUILD_DEFS, type BuildId } from '../core/sim/offers';
-import { CARPETS, type CarpetId, type TemplateId } from '../core/sim/types';
+/** Bau-Popup: kaufen, liefern, Personal, Preise, Deko und Freischaltung. */
+import { BUILD_DEFS } from '../core/sim/offers';
+import { CARPETS, type CarpetId, type StaffRole, type TemplateId } from '../core/sim/types';
 import type { GameView } from '../store/types';
+import { ColorRow, CrateList, DisputeList, StaffGrid, TemplateGrid } from './build-panel-parts';
 import { vc } from './format';
 
 interface Props {
   readonly view: GameView;
-  readonly placing: BuildId | null;
   readonly onClose: () => void;
-  readonly onPick: (id: BuildId) => void;
+  readonly onBuy: (id: (typeof BUILD_DEFS)[number]['id']) => void;
   readonly onTemplate: (id: TemplateId) => void;
-  readonly onHire: (role: 'guard' | 'cleaner' | 'bartender') => void;
-  readonly onFire: (role: 'guard' | 'cleaner' | 'bartender') => void;
+  readonly onHire: (role: StaffRole) => void;
+  readonly onFire: (role: StaffRole) => void;
   readonly onPrice: (key: 'drinkPrice' | 'slotMinBet', value: number) => void;
   readonly onCarpet: (id: CarpetId) => void;
   readonly onRepair: (id: number) => void;
   readonly onClean: () => void;
+  readonly onPickup: (id: number) => void;
+  readonly onUnload: () => void;
+  readonly onOrderDrinks: (count: number) => void;
+  readonly onOrderParts: (count: number) => void;
+  readonly onUpgradeBar: () => void;
+  readonly onUpgradeWc: () => void;
+  readonly onWall: (color: string) => void;
+  readonly onNeon: (color: string) => void;
+  readonly onServeDesk: () => void;
+  readonly onCalm: (id: number) => void;
 }
 
-const TEMPLATES: readonly { id: TemplateId; name: string; note: string; cost: number }[] = [
-  { id: 'SMALL', name: 'Kleine Bude', note: '1 Saal, 1 Automat, alles überschaubar.', cost: 30 },
-  { id: 'MEDIUM', name: 'Mittleres Haus', note: 'Mehr Tische, Bar, Klo, Platz für Personal.', cost: 120 },
-  { id: 'LARGE', name: 'Großes Casino', note: 'Alle Spiele, Deko, Personal, volle Fläche.', cost: 600 },
-];
+const WALLS = ['#241a35', '#3d1f2e', '#1f3d2e', '#2e3d1f'];
+const NEONS = ['#00ffcc', '#ff2e88', '#ffd166', '#b06bff'];
 
 export function BuildPanel(props: Props) {
-  const { view, placing, onClose, onPick, onTemplate, onHire, onFire, onPrice, onCarpet, onRepair, onClean } = props;
-  const broken = view.furniture.filter((item) => item.condition < 85 || item.damaged).sort((a, b) => a.condition - b.condition).slice(0, 4);
+  const { view } = props;
+  const broken = view.furniture.filter((item) => item.condition < 85 || item.damaged || item.clogged)
+    .sort((a, b) => a.condition - b.condition).slice(0, 4);
+  const carrying = /^KRATE:(\d+)$/.exec(view.player.carrying);
+  const carriedId = carrying ? Number(carrying[1]) : null;
   return (
     <aside className="build-panel" aria-label="Bauen">
       <header className="build-head">
@@ -34,10 +44,10 @@ export function BuildPanel(props: Props) {
           <span className="eyebrow">DEIN ANGEBOT</span>
           <h2>Bauen</h2>
         </div>
-        <button type="button" className="popup-close" onClick={onClose} aria-label="Schließen">×</button>
+        <button type="button" className="popup-close" onClick={props.onClose} aria-label="Schließen">×</button>
       </header>
       <div className="build-scroll">
-        <p className="panel-note">Ziehe ein Spiel auf den Floor oder klicke es an und setze es mit einem Klick.</p>
+        <p className="panel-note">Käufe kommen als Kiste am Eingang an. Abholen, tragen, aufstellen.</p>
 
         <h3>Spiele & Deko</h3>
         <div className="build-grid">
@@ -48,12 +58,12 @@ export function BuildPanel(props: Props) {
                 key={def.id}
                 type="button"
                 draggable
-                className={`build-card${placing === def.id ? ' placing' : ''}${poor ? ' poor' : ''}`}
+                className={`build-card${poor ? ' poor' : ''}`}
                 onDragStart={(event) => {
                   event.dataTransfer.setData('text/build', def.id);
                   event.dataTransfer.effectAllowed = 'copy';
                 }}
-                onClick={() => onPick(def.id)}
+                onClick={() => props.onBuy(def.id)}
                 disabled={poor}
               >
                 <span className="build-icon">{def.gameId ? '▦' : '✿'}</span>
@@ -65,28 +75,33 @@ export function BuildPanel(props: Props) {
           })}
         </div>
 
+        <h3>Lieferungen {view.crates.length > 0 ? `(${view.crates.length})` : ''}</h3>
+        <CrateList view={view} carriedId={carriedId} onPickup={props.onPickup} onUnload={props.onUnload} />
+        <DisputeList view={view} onCalm={props.onCalm} />
+
         <h3>Haus</h3>
-        <div className="template-grid">
-          {TEMPLATES.map((template) => (
-            <button
-              key={template.id}
-              type="button"
-              className={`template-card${view.template === template.id ? ' active' : ''}`}
-              onClick={() => onTemplate(template.id)}
-              disabled={view.template === template.id || view.house < template.cost * 10_000}
-            >
-              <strong>{template.name}</strong>
-              <span>{template.note}</span>
-              <b>{vc(template.cost * 10_000, 0)}</b>
-            </button>
-          ))}
-        </div>
+        <TemplateGrid view={view} onTemplate={props.onTemplate} />
 
         <h3>Personal</h3>
-        <div className="staff-grid">
-          <Staff label="Guard" note="Hält Wut im Zaum. Tageslohn." wage={view.prices.guardWage} on={view.staff.guard} onHire={() => onHire('guard')} onFire={() => onFire('guard')} />
-          <Staff label="Reinigung" note="Putzt automatisch. Tageslohn." wage={view.prices.staffWage} on={view.staff.cleaner} onHire={() => onHire('cleaner')} onFire={() => onFire('cleaner')} />
-          <Staff label="Barkeeper" note="Bar bleibt besetzt. Tageslohn." wage={view.prices.staffWage} on={view.staff.bartender} onHire={() => onHire('bartender')} onFire={() => onFire('bartender')} />
+        <StaffGrid view={view} onHire={props.onHire} onFire={props.onFire} />
+        <div className="ops-row">
+          <button type="button" className="btn" onClick={props.onServeDesk}>KASSE BEDIENEN</button>
+        </div>
+
+        <h3>Lager & Bar (Teile: {view.parts})</h3>
+        <div className="ops-row">
+          <button type="button" className="btn" onClick={() => props.onOrderDrinks(6)} disabled={view.house < view.prices.drinkCrateCost * 6}>
+            6 DRINKS {vc(view.prices.drinkCrateCost * 6, 1)}
+          </button>
+          <button type="button" className="btn" onClick={() => props.onOrderParts(2)} disabled={view.house < view.prices.partCost * 2}>
+            2 ERSATZTEILE {vc(view.prices.partCost * 2, 1)}
+          </button>
+          <button type="button" className="btn" onClick={props.onUpgradeBar} disabled={view.barLevel >= 3 || view.house < view.prices.barUpgrade}>
+            BAR STUFE {view.barLevel}{view.barLevel < 3 ? ` · ${vc(view.prices.barUpgrade, 0)}` : ' · MAX'}
+          </button>
+          <button type="button" className="btn" onClick={props.onUpgradeWc} disabled={view.wcLevel >= 3 || view.house < view.prices.wcUpgrade}>
+            WC STUFE {view.wcLevel}{view.wcLevel < 3 ? ` · ${vc(view.prices.wcUpgrade, 0)}` : ' · MAX'}
+          </button>
         </div>
 
         <h3>Preise</h3>
@@ -94,13 +109,25 @@ export function BuildPanel(props: Props) {
           <label>
             <span>DRINK</span>
             <input type="number" min="0" step="0.05" defaultValue={(view.prices.drinkPrice / 10_000).toFixed(2)}
-              onBlur={(event) => onPrice('drinkPrice', Number(event.target.value))} />
+              onBlur={(event) => props.onPrice('drinkPrice', Number(event.target.value))} />
           </label>
           <label>
             <span>MINDESTEINSATZ</span>
             <input type="number" min="0" step="0.05" defaultValue={(view.prices.slotMinBet / 10_000).toFixed(2)}
-              onBlur={(event) => onPrice('slotMinBet', Number(event.target.value))} />
+              onBlur={(event) => props.onPrice('slotMinBet', Number(event.target.value))} />
           </label>
+        </div>
+
+        <h3>Farben</h3>
+        <div className="price-grid">
+          <div>
+            <span>WAND</span>
+            <ColorRow colors={WALLS} active={view.wallColor} onPick={props.onWall} />
+          </div>
+          <div>
+            <span>NEON</span>
+            <ColorRow colors={NEONS} active={view.neonColor} onPick={props.onNeon} />
+          </div>
         </div>
 
         <h3>Teppich</h3>
@@ -111,7 +138,7 @@ export function BuildPanel(props: Props) {
               type="button"
               className={`carpet${view.carpet === id ? ' active' : ''}`}
               style={{ background: `#${CARPETS[id].color.toString(16).padStart(6, '0')}` }}
-              onClick={() => onCarpet(id)}
+              onClick={() => props.onCarpet(id)}
               title={CARPETS[id].name}
               aria-label={CARPETS[id].name}
             />
@@ -120,28 +147,17 @@ export function BuildPanel(props: Props) {
 
         <h3>Betrieb</h3>
         <div className="ops-row">
-          <button type="button" className="btn" onClick={onClean} disabled={view.dirtyTiles.length === 0 || view.house < view.prices.cleaningCost * view.dirtyTiles.length}>
+          <button type="button" className="btn" onClick={props.onClean} disabled={view.dirtyTiles.length === 0 || view.house < view.prices.cleaningCost * view.dirtyTiles.length}>
             PUTZEN {view.dirtyTiles.length > 0 ? `(${view.dirtyTiles.length}) · ${vc(view.prices.cleaningCost * view.dirtyTiles.length, 2)}` : ''}
           </button>
           {broken.map((item) => (
-            <button key={item.id} type="button" className="btn repair" onClick={() => onRepair(item.id)} disabled={view.house < view.prices.repairCost}>
-              {item.label} reparieren · {vc(view.prices.repairCost, 0)}
+            <button key={item.id} type="button" className="btn repair" onClick={() => props.onRepair(item.id)} disabled={view.house < view.prices.repairCost || view.parts <= 0}>
+              {item.label} reparieren · {vc(view.prices.repairCost, 0)}{item.clogged ? ' · VERSTOPFT' : ''}
             </button>
           ))}
           {broken.length === 0 && <small className="muted">Alles heil.</small>}
         </div>
       </div>
     </aside>
-  );
-}
-
-function Staff(props: { label: string; note: string; wage: number; on: boolean; onHire: () => void; onFire: () => void }) {
-  return (
-    <div className={`staff${props.on ? ' on' : ''}`}>
-      <div><strong>{props.label}</strong><small>{props.note} · {vc(props.wage, 0)}/Tag</small></div>
-      <button type="button" className={`btn small${props.on ? ' ghost' : ''}`} onClick={props.on ? props.onFire : props.onHire}>
-        {props.on ? 'ENTLASSEN' : 'EINSTELLEN'}
-      </button>
-    </div>
   );
 }

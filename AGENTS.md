@@ -1,0 +1,38 @@
+# Rigged by Design
+
+Vite + React 19 + TypeScript + PixiJS 8 casino sim. No real money; VaCoins are integer micro-units (1 VC = 10.000). Simulation is headless in `src/core/`; `world-store` owns world, ledger, PRNG, clock, save.
+
+## Dev environment
+
+- Node 22, npm. `npm ci` then `npm run dev` (http://localhost:3000).
+- Save format v7; v5/v6 migrate (keep Fiat + open payouts), v3/v4 discarded.
+
+## Build & test
+
+- `npm run test` — Vitest run (CI alias `test:ci`).
+- `npm run typecheck` — `tsc --noEmit`.
+- `npm run lint` / `lint:fix` — ESLint.
+- `npm run check:loc` — LOC guard (200 LOC/file; 350 with `// @loc-exception:` on line 1, min 1 char reason).
+- `npm run verify:all` — fail-closed pipeline (autofix, lint, LOC, typecheck, test contract, dead-export, dep matrix, audit, vitest, build).
+- `npm run test:perf` — bench (not in verify:all).
+- `npm run build` — Vite production build.
+
+## Delivery
+
+- After a turn: `npm run turn:finish -- <paths>` stages only named paths, runs gates, commits, pushes to `main`. Without args, only tracked changes (never whole tree).
+- If branch protection rejects direct push, push the working branch and open a focused PR to `main`.
+
+## Conventions
+
+- `src/core/` must stay headless (no browser deps) and testable.
+- One owner per state: `world-store` holds world/ledger/PRNG; UI state (popups) lives in React.
+- Money is integer micro-units; no floats; every transaction is a ledger line.
+- RNG via `src/core/rng/weighted.ts` (`buildDistribution`, `rollNumber`); cards via `src/core/rng/shoe.ts` (draw removes card; reshuffle only when empty).
+- No `addVC` outside a booking; no money source except `EXTERNAL_WORLD`.
+
+## Pitfalls
+
+- Do not hand-edit generated files in `dist/`.
+- LOC guard fails the build; keep files under limits or add justified `// @loc-exception:`.
+- `test:perf` intentionally not in `verify:all`; don't gate on it on slow hardware.
+- Commit messages verified by `verify:commit-msg`; new error codes in `docs/ERROR_CATALOG.md`.

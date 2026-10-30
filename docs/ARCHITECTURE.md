@@ -58,13 +58,13 @@ Jede Laufzeit- und Entwicklungabhängigkeit braucht eine nicht-leere Begründung
 | @vitejs/plugin-react | ^4.3.4 | Build | React-19-JSX-Transform und Fast Refresh fuer Vite. | 1: `vite.config.ts` |
 | eslint | ^10.13.0 | Lint | Fail-Closed-Lint-Gate mit TypeScript-Parser und ungenutzten Symbolen. | 2: `eslint.config.mjs`<br>`package.json` |
 | globals | ^16.5.0 | Lint | Browser- und Node-Globals fuer die ESLint-Konfiguration. | 1: `eslint.config.mjs` |
-| pixi.js | ^8.6.6 | Runtime | WebGL/Canvas-Renderer fuer Floor, Figuren, Sticker und Spiele; kein DOM-Rendering im Spielfeld. | 8: `src/render/comic-bubbles.ts`<br>`src/render/floor-camera.ts`<br>`src/render/floor-stage.tsx`<br>`src/render/floor-view.ts`<br>`src/render/furniture-art.ts`<br>`src/render/guest-art.ts`<br>… (+2) |
+| pixi.js | ^8.6.6 | Runtime | WebGL/Canvas-Renderer fuer Floor, Figuren, Sticker und Spiele; kein DOM-Rendering im Spielfeld. | 10: `src/render/comic-bubbles.ts`<br>`src/render/floor-camera.ts`<br>`src/render/floor-perf.bench.ts`<br>`src/render/floor-props.ts`<br>`src/render/floor-stage.tsx`<br>`src/render/floor-view.ts`<br>… (+4) |
 | react | ^19.0.0 | UI | Deklarative HUD-, Popup- und Panel-Oberflaeche mit einem Store-Snapshot. | 8: `src/App.tsx`<br>`src/main.tsx`<br>`src/render/floor-stage.tsx`<br>`src/store/use-world-store.ts`<br>`src/ui/games-popup.tsx`<br>`src/ui/guest-popup.tsx`<br>… (+2) |
 | react-dom | ^19.0.0 | UI | Mountet die React-Oberflaeche in den Browser. | 1: `src/main.tsx` |
 | typescript | ^5.7.3 | Build | Strikte Typpruefung mit noUncheckedIndexedAccess und ungenutzten Symbolen. | 1: `tsconfig.json` |
 | typescript-eslint | ^8.72.1 | Lint | TypeScript-Parser und Regeln fuer das Lint-Gate. | 1: `eslint.config.mjs` |
 | vite | ^6.0.7 | Build | Dev-Server und Production-Bundler; liefert die Modul- und CSS-Pipeline. | 1: `package.json` |
-| vitest | ^5.0.5 | Test | Deterministische Unit- und Monte-Carlo-Beweise fuer Ledger, Spiele und Simulation. | 17: `package.json`<br>`src/core/economy/__tests__/economy.test.ts`<br>`src/core/games/__tests__/contracts.test.ts`<br>`src/core/games/__tests__/round.bench.ts`<br>`src/core/games/__tests__/round.test.ts`<br>`src/core/governance/__tests__/dependency-governance.test.ts`<br>… (+11) |
+| vitest | ^5.0.5 | Test | Deterministische Unit- und Monte-Carlo-Beweise fuer Ledger, Spiele und Simulation. | 22: `package.json`<br>`src/core/economy/__tests__/economy.test.ts`<br>`src/core/games/__tests__/contracts.test.ts`<br>`src/core/games/__tests__/round.bench.ts`<br>`src/core/games/__tests__/round.test.ts`<br>`src/core/governance/__tests__/dependency-governance.test.ts`<br>… (+16) |
 <!-- DEP_MATRIX_END -->
 
 ## Delivery-Regel
@@ -78,3 +78,9 @@ npm run turn:finish
 `turn:finish` führt Autofix und `verify:all` aus, erzeugt bei Änderungen einen Commit im deutschen Steam-Developer-Notes-Format (ohne Drittanbieter-Trailer) und pusht auf `main`. Gestaged werden nur die übergebenen Pfade; ohne Argumente ausschließlich bereits verfolgte Änderungen, damit kein fremder oder unverfolgter Inhalt mitgeht. Ein fehlgeschlagenes Gate verhindert Commit und Push. Lehnt der Branch-Schutz den Direktpush ab, wird der Arbeitsbranch gepusht und ein fokussierter PR gegen `main` nötig.
 
 Der Geschwindigkeits-Benchmark läuft separat über `npm run test:perf` und ist absichtlich nicht Teil von `verify:all`: Er misst Durchsatz und ist kein Korrektheitsgate.
+
+## Floor-Rendering und Performance
+
+Der Boden liegt in 30×30-Regions-Chunks (`src/render/scene-cache.ts`); ein Chunk backt nur neu, wenn sich sein Regions-Hash (`src/render/floor-math.ts`) ändert. Möbel stehen auf einer eigenen Ebene und backen den Boden nicht neu. Dreck wird pro Region invalidiert. Kamera, LOD, Culling und Koordinaten sind reine Mathe und getestet (`src/render/__tests__/floor-cache.test.ts`). Agenten, Kisten, Dispute und Platzierungs-Geist laufen auf der Requisiten-Ebene (`src/render/floor-props.ts`).
+
+Worst-Case-Messung (90×90, 9 Regionen, `npm run test:perf`, gleiche Hardware wie Laufzeit nicht garantiert): 9 Regions-Hashes 0,002 ms, Voll-Backen aller 9 Chunks 3,3 ms (nur bei Template-/Teppichwechsel), Dreck 2,2 ms (nur veränderte Regionen), Culling über 200 Entities 0,006 ms. Steady-State pro Tick: Hash + Culling, keine Neuzeichnung.

@@ -5,6 +5,7 @@ import { blockedTiles, nearestWalkable } from './pathfinding';
 import type { Prng } from '../rng/prng';
 import { pickWeighted } from '../rng/weighted';
 import { clamp } from './guest-core';
+import { refreshNeeds } from './needs';
 import { becomeAngry } from './guest-service';
 import { guestAccount } from './money';
 import { offerScore } from './offers';
@@ -59,6 +60,7 @@ function tryGame(world: WorldState, guest: Guest, wallet: VaCoinMicro, prng: Prn
 }
 
 export function chooseActivity(world: WorldState, guest: Guest, ledger: Ledger, prng: Prng): void {
+  refreshNeeds(guest);
   const wallet = ledger.getBalance(guestAccount(guest.id));
   if (wallet < world.prices.slotMinBet) {
     guest.state = 'CASHOUT';
@@ -71,14 +73,14 @@ export function chooseActivity(world: WorldState, guest: Guest, ledger: Ledger, 
 
   const wantsToilet = guest.need === 'toilet' || guest.patience < 22 || guest.mood < 22;
   if (wantsToilet) {
-    const toilet = world.furniture.find((item) => item.kind === 'TOILET' && freeSeat(item));
+    const toilet = world.furniture.find((item) => item.kind === 'TOILET' && !item.clogged && freeSeat(item));
     if (toilet && startActivity(world, guest, toilet)) return;
   }
 
   const wantsDrink = wallet >= world.prices.drinkPrice
     && (guest.need === 'drink' || guest.mood < 44 || guest.patience < 38 || (guest.sociability > 68 && guest.mood < 55));
   if (wantsDrink) {
-    const bar = world.furniture.find((item) => item.kind === 'BAR' && freeSeat(item));
+    const bar = world.furniture.find((item) => item.kind === 'BAR' && item.stock > 0 && freeSeat(item));
     if (bar && startActivity(world, guest, bar)) return;
   }
 
@@ -89,12 +91,12 @@ export function chooseActivity(world: WorldState, guest: Guest, ledger: Ledger, 
 
   if (tryGame(world, guest, wallet, prng)) return;
 
-  // Kein freier Spielplatz: erst Bar, dann Sofa, dann Klo, sonst warten.
-  const bar = world.furniture.find((item) => item.kind === 'BAR' && freeSeat(item));
+  // Kein freier Spielplatz: erst Bar mit Bestand, dann Sofa, dann freies Klo, sonst warten.
+  const bar = world.furniture.find((item) => item.kind === 'BAR' && item.stock > 0 && freeSeat(item));
   if (bar && wallet >= world.prices.drinkPrice && startActivity(world, guest, bar)) return;
   const sofa = world.furniture.find((item) => item.kind === 'DECOR' && item.seats > 0 && freeSeat(item));
   if (sofa && startActivity(world, guest, sofa)) return;
-  const toilet = world.furniture.find((item) => item.kind === 'TOILET' && freeSeat(item));
+  const toilet = world.furniture.find((item) => item.kind === 'TOILET' && !item.clogged && freeSeat(item));
   if (toilet && startActivity(world, guest, toilet)) return;
   waitForSpace(world, guest);
 }

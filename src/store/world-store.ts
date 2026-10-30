@@ -4,15 +4,23 @@ import { Ledger } from '../core/economy/ledger';
 import { fromVC, toVCString, ZERO_VC, type VaCoinMicro } from '../core/economy/vacoin';
 import type { GameResult } from '../core/games/contracts';
 import {
-  build, cleanAll, cleanTile, fire, foreignRound, hire, installMod, movePlayer,
-  payGuest, repair, serveDrink, setBaseBet, setCarpet, setPrice, takeDrink, testSpin, upgradeReels,
+  cleanAll, cleanTile, foreignRound, installMod,
+  payGuest, repair, setBaseBet, setCarpet, setPrice,
+  testSpin, upgradeReels,
 } from '../core/sim/actions';
+import {
+  deployHeldCrate, movePlayer, pickupCrate, serveDesk, serveDrink,
+  setNeonColor, setWallColor, storeHeldCrate, takeDrink, upgradeBar, upgradeWc,
+} from '../core/sim/player';
+import { buyCrate, orderDrinks, orderParts } from '../core/sim/deliveries';
+import { calmDispute } from '../core/sim/disputes';
 import { HAUSKONTO, HOUSE_FLOAT, playerTakeHome } from '../core/sim/money';
+import { fireAgent, hireAgent } from '../core/sim/staff';
 import type { BuildId } from '../core/sim/offers';
 import { remodel } from '../core/sim/remodel';
 import { createWorld, ensureStarter } from '../core/sim/templates';
 import { tickWorld } from '../core/sim/tick';
-import type { CarpetId, GameId, ModId, Point, TemplateId, WorldState } from '../core/sim/types';
+import type { CarpetId, GameId, ModId, Point, StaffRole, TemplateId, WorldState } from '../core/sim/types';
 import { Prng } from '../core/rng/prng';
 import { buildView } from './snapshot';
 import { clearOldSave, loadWorld, saveWorld } from './save';
@@ -80,10 +88,97 @@ class WorldStore {
     this.#emit();
   }
 
-  build(id: BuildId, x: number, y: number): void {
+  buy(id: BuildId): void {
     this.#guard(() => {
-      build(this.#world, this.#ledger, id, x, y);
-      this.#notice = 'Objekt aufgestellt.';
+      buyCrate(this.#world, this.#ledger, id);
+      this.#notice = this.#world.lastEvent;
+    });
+  }
+
+  orderDrinks(count: number): void {
+    this.#guard(() => {
+      orderDrinks(this.#world, this.#ledger, count);
+      this.#notice = this.#world.lastEvent;
+    });
+  }
+
+  orderParts(count: number): void {
+    this.#guard(() => {
+      orderParts(this.#world, this.#ledger, count);
+      this.#notice = this.#world.lastEvent;
+    });
+  }
+
+  pickup(crateId: number): void {
+    this.#guard(() => {
+      pickupCrate(this.#world, crateId);
+      this.#notice = this.#world.lastEvent;
+    });
+  }
+
+  deploy(x: number, y: number): void {
+    this.#guard(() => {
+      deployHeldCrate(this.#world, x, y);
+      this.#notice = this.#world.lastEvent;
+    });
+  }
+
+  unloadHere(): void {
+    this.#guard(() => {
+      const pos = this.#world.player.position;
+      const bar = this.#world.furniture.find((item) => item.kind === 'BAR'
+        && Math.abs(item.x - pos.x) + Math.abs(item.y - pos.y) <= 3);
+      storeHeldCrate(this.#world, pos.x, pos.y, bar?.id);
+      this.#notice = this.#world.lastEvent;
+    });
+  }
+
+  storeDeposit(x: number, y: number, barId?: number): void {
+    this.#guard(() => {
+      storeHeldCrate(this.#world, x, y, barId);
+      this.#notice = this.#world.lastEvent;
+    });
+  }
+
+  calm(disputeId: number): void {
+    this.#guard(() => {
+      if (!calmDispute(this.#world, disputeId)) throw new Error('Zu weit weg. Geh zum Streit.');
+      this.#notice = this.#world.lastEvent;
+    });
+  }
+
+  serveDesk(): void {
+    this.#guard(() => {
+      const served = serveDesk(this.#world, this.#ledger, this.#prng);
+      this.#notice = served ? 'Gast gewechselt.' : 'Niemand wartet an der Kasse.';
+    });
+  }
+
+  setWall(color: string): void {
+    this.#guard(() => {
+      setWallColor(this.#world, color);
+      this.#notice = 'Wand gestrichen.';
+    });
+  }
+
+  setNeon(color: string): void {
+    this.#guard(() => {
+      setNeonColor(this.#world, color);
+      this.#notice = 'Neon neu gefärbt.';
+    });
+  }
+
+  upgradeBar(): void {
+    this.#guard(() => {
+      upgradeBar(this.#world, this.#ledger);
+      this.#notice = this.#world.lastEvent;
+    });
+  }
+
+  upgradeWc(): void {
+    this.#guard(() => {
+      upgradeWc(this.#world, this.#ledger);
+      this.#notice = this.#world.lastEvent;
     });
   }
 
@@ -106,16 +201,16 @@ class WorldStore {
     });
   }
 
-  hire(role: 'guard' | 'cleaner' | 'bartender'): void {
+  hire(role: StaffRole): void {
     this.#guard(() => {
-      hire(this.#world, this.#ledger, role);
-      this.#notice = 'Personal eingestellt.';
+      hireAgent(this.#world, this.#ledger, role);
+      this.#notice = this.#world.lastEvent;
     });
   }
 
-  fire(role: 'guard' | 'cleaner' | 'bartender'): void {
+  fire(role: StaffRole): void {
     this.#guard(() => {
-      fire(this.#world, role);
+      fireAgent(this.#world, role);
       this.#notice = 'Personal entlassen.';
     });
   }

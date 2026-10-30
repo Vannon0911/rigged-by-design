@@ -1,6 +1,6 @@
 /** Was die UI sieht: Welt plus abgeleitete Ledger-Werte. */
 import type { VaCoinMicro } from '../core/economy/vacoin';
-import type { Guest, Player, PriceBook, StaffState, TemplateId, Zone, Furniture, CarpetId } from '../core/sim/types';
+import type { Crate, Dispute, Guest, Player, PriceBook, StaffAgent, StaffState, TemplateId, Zone, Furniture, CarpetId } from '../core/sim/types';
 
 export interface GameView {
   readonly template: TemplateId;
@@ -17,6 +17,15 @@ export interface GameView {
   readonly prices: PriceBook;
   readonly carpet: CarpetId;
   readonly lastEvent: string;
+  readonly crates: readonly Crate[];
+  readonly agents: readonly StaffAgent[];
+  readonly disputes: readonly Dispute[];
+  readonly parts: number;
+  readonly guestsServed: number;
+  readonly wallColor: string;
+  readonly neonColor: string;
+  readonly barLevel: number;
+  readonly wcLevel: number;
   readonly house: VaCoinMicro;
   readonly wallet: VaCoinMicro;
   readonly desk: VaCoinMicro;

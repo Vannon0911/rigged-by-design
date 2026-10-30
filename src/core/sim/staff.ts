@@ -1,0 +1,193 @@
+/** Personal: eingestellte Rollen bekommen einen Körper, der auf dem Floor arbeitet. */
+import type { Ledger } from '../economy/ledger';
+import type { VaCoinMicro } from '../economy/vacoin';
+import { chooseActivity } from './guest-choice';
+import { depositCrate, takeCrate } from './deliveries';
+import { exchangeFiat, HAUSKONTO, pendingAccount, STAFF } from './money';
+import type { Prng } from '../rng/prng';
+import type { StaffAgent, StaffRole, WorldState } from './types';
+import { blockedTiles, nearestWalkable } from './pathfinding';
+import { exchangePoint, interactionPoint, pathTo, spawnPoint } from './world';
+
+export const CASHIER_WAIT = 12;
+
+function wageFor(world: WorldState, role: StaffRole): VaCoinMicro {
+  if (role === 'guard') return world.prices.guardWage;
+  if (role === 'cashier') return world.prices.cashierWage;
+  if (role === 'porter') return world.prices.porterWage;
+  return world.prices.staffWage;
+}
+
+const dist = (ax: number, ay: number, bx: number, by: number): number =>
+  Math.abs(ax - bx) + Math.abs(ay - by);
+
+/** Einstellen kostet einmalig einen Tagessatz und stellt den Agenten an den Eingang. */
+export function hireAgent(world: WorldState, ledger: Ledger, role: StaffRole): StaffAgent {
+  const existing = world.agents.find((agent) => agent.role === role);
+  if (world.staff[role] && existing) return existing;
+  ledger.transfer(HAUSKONTO, STAFF, wageFor(world, role), 'einstellung', world.tick);
+  world.staff[role] = true;
+  if (role === 'guard') world.guardsHired += 1;
+  const spawn = spawnPoint(world);
+  const agent: StaffAgent = {
+    id: world.nextAgentId++, role, x: spawn.x, y: spawn.y, path: [], pathIndex: 0,
+    carryingCrate: null, workTicks: 0,
+  };
+  world.agents.push(agent);
+  world.lastEvent = `${role === 'guard' ? 'Guard' : role === 'cleaner' ? 'Reinigungskraft'
+    : role === 'bartender' ? 'Barkeeper' : role === 'cashier' ? 'Kassierer' : 'Lagerträger'} eingestellt.`;
+  return agent;
+}
+
+export function fireAgent(world: WorldState, role: StaffRole): void {
+  world.staff[role] = false;
+  world.agents = world.agents.filter((agent) => agent.role !== role);
+  for (const crate of world.crates) {
+    if (typeof crate.carriedBy === 'number' && !world.agents.some((agent) => agent.id === crate.carriedBy)) {
+      crate.carriedBy = null;
+    }
+  }
+  world.lastEvent = 'Personal entlassen.';
+}
+
+/** Ein Feld pro Tick; alle sechs Ticks wird der Weg neu geplant. */
+function stepToward(world: WorldState, agent: StaffAgent, tx: number, ty: number): boolean {
+  agent.workTicks += 1;
+  if (agent.x === tx && agent.y === ty) return true;
+  if (agent.workTicks % 6 === 1 || agent.pathIndex >= agent.path.length) {
+    agent.path = pathTo(world, { x: agent.x, y: agent.y }, { x: tx, y: ty });
+    agent.pathIndex = 0;
+  }
+  if (agent.pathIndex < agent.path.length) {
+    const next = agent.path[agent.pathIndex]!;
+    agent.pathIndex += 1;
+    agent.x = next.x;
+    agent.y = next.y;
+  }
+  return agent.x === tx && agent.y === ty;
+}
+
+function porterTick(world: WorldState, ledger: Ledger, agent: StaffAgent): void {
+  void ledger;
+  const held = agent.carryingCrate !== null
+    ? world.crates.find((crate) => crate.id === agent.carryingCrate) ?? null : null;
+  if (!held) {
+    agent.carryingCrate = null;
+    const job = world.crates.find((crate) =>
+      crate.carriedBy === null && crate.payload.kind !== 'FURNITURE');
+    if (!job) return;
+    if (dist(agent.x, agent.y, job.x, job.y) <= 1) {
+      takeCrate(world, job.id, agent.id);
+      agent.carryingCrate = job.id;
+      agent.path = [];
+      agent.pathIndex = 0;
+    } else stepToward(world, agent, job.x, job.y);
+    return;
+  }
+  if (held.payload.kind === 'DRINKS') {
+    const bars = world.furniture.filter((item) => item.kind === 'BAR');
+    let target = bars[0];
+    for (const bar of bars) {
+      if (bar.stock < (target?.stock ?? Number.MAX_SAFE_INTEGER)) target = bar;
+    }
+    if (!target) return;
+    if (dist(agent.x, agent.y, target.x, target.y) <= 3) {
+      try {
+        const done = depositCrate(world, held.id, agent.x, agent.y, target.id);
+        if (done.emptied) agent.carryingCrate = null;
+      } catch { agent.path = []; agent.pathIndex = 0; }
+      return;
+    }
+    const spot = interactionPoint(world, target);
+    if (spot) stepToward(world, agent, spot.x, spot.y);
+    return;
+  }
+  const storage = world.zones.find((zone) => zone.id === 'storage');
+  if (storage && agent.x >= storage.x && agent.y >= storage.y
+    && agent.x < storage.x + storage.w && agent.y < storage.y + storage.h) {
+    try {
+      depositCrate(world, held.id, agent.x, agent.y);
+      agent.carryingCrate = null;
+    } catch { /* Lager voll oder blockiert */ }
+    return;
+  }
+  if (storage) {
+    const spot = nearestWalkable(world.size, blockedTiles(world.size, world.furniture),
+      { x: storage.x + Math.floor(storage.w / 2), y: storage.y + Math.floor(storage.h / 2) });
+    if (spot) stepToward(world, agent, spot.x, spot.y);
+  }
+}
+
+function cashierTick(world: WorldState, ledger: Ledger, agent: StaffAgent, prng: Prng): void {
+  const point = exchangePoint(world);
+  if (!point) return;
+  const near = dist(agent.x, agent.y, point.x, point.y) <= 8;
+  if (!near) { stepToward(world, agent, point.x, point.y); return; }
+  for (const guest of world.guests) {
+    if (guest.state === 'EXCHANGE' && guest.queueIndex === 0) {
+      try {
+        exchangeFiat(ledger, guest.id, world.tick);
+      } catch {
+        guest.patience = Math.max(0, guest.patience - 2);
+        continue;
+      }
+      chooseActivity(world, guest, ledger, prng);
+    }
+    if (guest.state === 'CASHOUT' && ledger.getBalance(pendingAccount(guest.id)) > 0) {
+      guest.stateTicks = Math.max(guest.stateTicks, CASHIER_WAIT);
+    }
+  }
+}
+
+function guardTick(world: WorldState, agent: StaffAgent, prng: Prng): void {
+  const dispute = world.disputes[0];
+  if (dispute) {
+    if (dist(agent.x, agent.y, dispute.x, dispute.y) > 7) stepToward(world, agent, dispute.x, dispute.y);
+    else agent.workTicks += 1;
+    return;
+  }
+  const angry = world.guests.find((guest) => guest.state === 'ANGRY');
+  if (angry) { stepToward(world, agent, angry.position.x, angry.position.y); return; }
+  const gaming = world.zones.find((zone) => zone.kind === 'GAMING');
+  if (agent.pathIndex >= agent.path.length && prng.nextFloat() < 0.2 && gaming) {
+    const tx = gaming.x + 1 + Math.floor(prng.nextFloat() * Math.max(1, gaming.w - 2));
+    const ty = gaming.y + 1 + Math.floor(prng.nextFloat() * Math.max(1, gaming.h - 2));
+    agent.path = pathTo(world, { x: agent.x, y: agent.y }, { x: tx, y: ty });
+    agent.pathIndex = 0;
+  }
+  if (agent.pathIndex < agent.path.length) {
+    const next = agent.path[agent.pathIndex]!;
+    agent.pathIndex += 1;
+    agent.x = next.x;
+    agent.y = next.y;
+  }
+  agent.workTicks += 1;
+}
+
+function cleanerTick(world: WorldState, agent: StaffAgent): void {
+  const first = [...world.dirty][0];
+  if (first === undefined) return;
+  const tx = first % world.size;
+  const ty = Math.floor(first / world.size);
+  if (dist(agent.x, agent.y, tx, ty) <= 1) { world.dirty.delete(first); return; }
+  stepToward(world, agent, tx, ty);
+}
+
+function bartenderTick(world: WorldState, agent: StaffAgent): void {
+  const bar = world.furniture.find((item) => item.kind === 'BAR');
+  if (!bar) return;
+  if (dist(agent.x, agent.y, bar.x, bar.y) <= 3) { agent.workTicks += 1; return; }
+  const spot = interactionPoint(world, bar);
+  if (spot) stepToward(world, agent, spot.x, spot.y);
+}
+
+/** Jede Rolle arbeitet sichtbar auf dem Floor statt als unsichtbarer Bonus. */
+export function tickAgents(world: WorldState, ledger: Ledger, prng: Prng): void {
+  for (const agent of world.agents) {
+    if (agent.role === 'porter') porterTick(world, ledger, agent);
+    else if (agent.role === 'cashier') cashierTick(world, ledger, agent, prng);
+    else if (agent.role === 'guard') guardTick(world, agent, prng);
+    else if (agent.role === 'cleaner') cleanerTick(world, agent);
+    else bartenderTick(world, agent);
+  }
+}

@@ -23,7 +23,6 @@ export default function App() {
   const view = useWorldStore();
   const [popup, setPopup] = useState<Popup>(null);
   const [buildOpen, setBuildOpen] = useState(false);
-  const [placing, setPlacing] = useState<BuildId | null>(null);
   const [placeError, setPlaceError] = useState('');
   const stage = useRef<FloorHandle>(null);
 
@@ -36,27 +35,31 @@ export default function App() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return;
-      if (placing) { setPlacing(null); setPlaceError(''); }
-      else if (buildOpen) setBuildOpen(false);
+      if (buildOpen) setBuildOpen(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [placing, buildOpen]);
+  }, [buildOpen]);
 
-  const place = (id: BuildId, x: number, y: number): void => {
-    if (!fits(view, id, x, y)) { setPlaceError('Da ist kein Platz. Freie Fläche wählen.'); return; }
+  const carryingCrate = view.player.carrying.startsWith('KRATE:');
+  const ghostId = (() => {
+    const match = /^KRATE:(\d+)$/.exec(view.player.carrying);
+    const crate = match ? view.crates.find((entry) => entry.id === Number(match[1])) : undefined;
+    return crate && crate.payload.kind === 'FURNITURE' ? crate.payload.buildId : null;
+  })();
+
+  const buy = (id: BuildId): void => {
     if (view.house < getBuildDef(id).cost) { setPlaceError('Das Hauskonto reicht nicht.'); return; }
-    worldStore.build(id, x, y);
-    setPlacing(null);
+    worldStore.buy(id);
     setPlaceError('');
-    setBuildOpen(false);
   };
 
-  const pick = (id: BuildId): void => {
-    setPlacing(id);
-    setPlaceError('');
-    setBuildOpen(false);
-    setPopup(null);
+  const deployAt = (x: number, y: number): void => {
+    const match = /^KRATE:(\d+)$/.exec(view.player.carrying);
+    const crate = match ? view.crates.find((entry) => entry.id === Number(match[1])) : undefined;
+    if (!crate || crate.payload.kind !== 'FURNITURE') return;
+    if (!fits(view, crate.payload.buildId, x, y)) return;
+    worldStore.deploy(x, y);
   };
 
   const active = popup?.kind === 'machine' ? view.furniture.find((item) => item.id === popup.itemId) ?? null : null;
@@ -73,23 +76,22 @@ export default function App() {
       />
 
       <main
-        className={`stage-wrap${placing ? ' is-placing' : ''}`}
+        className={`stage-wrap${carryingCrate ? ' is-placing' : ''}`}
         onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; }}
         onDrop={(event) => {
           event.preventDefault();
           const id = event.dataTransfer.getData('text/build') as BuildId;
-          const cell = stage.current?.cellAt(event.clientX, event.clientY);
-          if (id && cell) place(id, cell.x, cell.y);
+          if (id) buy(id);
         }}
       >
         <FloorStage
           ref={stage}
           view={view}
-          placing={Boolean(placing)}
+          placing={ghostId}
           onGuest={(id) => { setBuildOpen(false); setPopup({ kind: 'guests', guestId: id }); }}
           onFurniture={(id) => { setBuildOpen(false); setPopup({ kind: 'machine', itemId: id }); }}
           onEmpty={(x, y) => {
-            if (placing) { place(placing, x, y); return; }
+            if (carryingCrate) { deployAt(x, y); return; }
             worldStore.moveTo({ x, y });
           }}
         />
@@ -101,11 +103,10 @@ export default function App() {
           <span><b>RAD</b> zoomen</span>
         </div>
 
-        {placing && (
+        {carryingCrate && (
           <div className="place-hint">
-            <b>{getBuildDef(placing).name}</b>
-            <span>{placeError || 'Auf freie Fläche klicken. Ziehen geht auch.'}</span>
-            <button type="button" className="btn tiny" onClick={() => { setPlacing(null); setPlaceError(''); }}>ABBRECHEN</button>
+            <b>Kiste tragen</b>
+            <span>{placeError || 'Auf freie Fläche klicken zum Aufstellen.'}</span>
           </div>
         )}
 
@@ -119,9 +120,8 @@ export default function App() {
       {buildOpen && (
         <BuildPanel
           view={view}
-          placing={placing}
           onClose={() => setBuildOpen(false)}
-          onPick={pick}
+          onBuy={buy}
           onTemplate={(id: TemplateId) => worldStore.setTemplate(id)}
           onHire={(role) => worldStore.hire(role)}
           onFire={(role) => worldStore.fire(role)}
@@ -129,11 +129,21 @@ export default function App() {
           onCarpet={(id: CarpetId) => worldStore.setCarpet(id)}
           onRepair={(id) => worldStore.repair(id)}
           onClean={() => worldStore.clean()}
+          onPickup={(id) => worldStore.pickup(id)}
+          onUnload={() => worldStore.unloadHere()}
+          onOrderDrinks={(count) => worldStore.orderDrinks(count)}
+          onOrderParts={(count) => worldStore.orderParts(count)}
+          onUpgradeBar={() => worldStore.upgradeBar()}
+          onUpgradeWc={() => worldStore.upgradeWc()}
+          onWall={(color) => worldStore.setWall(color)}
+          onNeon={(color) => worldStore.setNeon(color)}
+          onServeDesk={() => worldStore.serveDesk()}
+          onCalm={(id) => worldStore.calm(id)}
         />
       )}
 
       {popup?.kind === 'guests' && (
-        <GuestPopup view={view} selectedId={popup.guestId} onClose={() => setPopup(null)} onPay={(id) => worldStore.pay(id)} onServe={(id) => worldStore.serveDrink(id)} />
+        <GuestPopup view={view} selectedId={popup.guestId} onClose={() => setPopup(null)} onPay={(id) => worldStore.pay(id)} onServe={(id) => worldStore.serveDrink(id)} onCalm={(id) => worldStore.calm(id)} />
       )}
 
       {popup?.kind === 'games' && (

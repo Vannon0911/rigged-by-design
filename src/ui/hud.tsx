@@ -51,6 +51,13 @@ export function Hud({ view, onBuild, onGuests, onVisit, onClean, onOverview }: H
           <strong>{view.reputation}<em>%</em></strong>
           <small>{dirty > 0 ? `${dirty} Flecken` : 'sauber'}</small>
         </div>
+        {(view.crates.length > 0 || view.disputes.length > 0) && (
+          <div className={`vital${view.disputes.length > 0 ? ' hot' : ''}`}>
+            <span>FLOOR</span>
+            <strong>{view.crates.length}<em>K</em> · {view.disputes.length}<em>S</em></strong>
+            <small>{view.parts} Teile · Tag {view.day}</small>
+          </div>
+        )}
       </div>
 
       <div className="hud-actions">

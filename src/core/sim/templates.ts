@@ -10,8 +10,14 @@ const PRICES: PriceBook = {
   slotMinBet: fromVC(0.05),
   staffWage: fromVC(4),
   guardWage: fromVC(6),
+  cashierWage: fromVC(5),
+  porterWage: fromVC(3),
   cleaningCost: fromVC(0.8),
   repairCost: fromVC(2),
+  partCost: fromVC(1.5),
+  drinkCrateCost: fromVC(0.6),
+  barUpgrade: fromVC(30),
+  wcUpgrade: fromVC(15),
 };
 
 const zone = (id: string, name: string, kind: Zone['kind'], x: number, y: number, w: number, h: number, color: number): Zone =>
@@ -22,7 +28,7 @@ function fixture(id: number, gameId: GameId, x: number, y: number, zoneId: strin
   return {
     id, kind: def.kind, gameId, x, y, w: def.w, h: def.h, seats: def.seats,
     label: def.name, price: def.cost, quality: def.quality, condition: 100, damaged: false, dirt: 0,
-    zoneId, occupants: [], mods: [], reels: def.reels, baseBet: def.baseBet,
+    stock: 0, clog: 0, clogged: false, zoneId, occupants: [], mods: [], reels: def.reels, baseBet: def.baseBet,
   };
 }
 
@@ -34,14 +40,16 @@ function service(id: number, kind: 'EXCHANGE' | 'BAR' | 'TOILET' | 'STORAGE', la
   const fp = SERVICE_FOOTPRINT[kind];
   return {
     id, kind, label, x, y, w: fp.w, h: fp.h, seats: fp.seats, price: fromVC(0), quality: 1,
-    condition: 100, damaged: false, dirt: 0, zoneId, occupants: [], mods: [], reels: 0, baseBet: 0 as VaCoinMicro,
+    condition: 100, damaged: false, dirt: 0, clog: 0, clogged: false,
+    stock: kind === 'BAR' ? 4 : 0,
+    zoneId, occupants: [], mods: [], reels: 0, baseBet: 0 as VaCoinMicro,
   };
 }
 
 function decor(id: number, label: string, x: number, y: number, w: number, h: number, seats: number, zoneId: string): Furniture {
   return {
-    id, kind: 'DECOR', label, x, y, w, h, seats, price: fromVC(0), quality: 1, condition: 100, damaged: false,
-    dirt: 0, zoneId, occupants: [], mods: [], reels: 0, baseBet: 0 as VaCoinMicro,
+    id, kind: 'DECOR',    label, x, y, w, h, seats, price: fromVC(0), quality: 1, condition: 100, damaged: false,
+    dirt: 0, stock: 0, clog: 0, clogged: false, zoneId, occupants: [], mods: [], reels: 0, baseBet: 0 as VaCoinMicro,
   };
 }
 
@@ -153,12 +161,25 @@ export function createWorld(template: TemplateId, carpet: CarpetId = 'VIOLET'): 
     player: { position: { x: entrance ? entrance.x + 2 : 2, y: entrance ? entrance.y + 2 : 15 }, path: [], pathIndex: 0, carrying: '' },
     dirty: new Set<number>(),
     prices: { ...PRICES },
-    staff: { guard: false, cleaner: false, bartender: false },
+    staff: { guard: false, cleaner: false, bartender: false, cashier: false, porter: false },
     carpet,
     tick: 0,
     day: 1,
     nextGuestId: 1,
     nextFurnitureId: 100,
+    crates: [],
+    agents: [],
+    disputes: [],
+    parts: 2,
+    guestsServed: 0,
+    reputation: 0,
+    wallColor: '#241a35',
+    neonColor: '#00ffcc',
+    barLevel: 1,
+    wcLevel: 1,
+    nextCrateId: 1,
+    nextAgentId: 1,
+    nextDisputeId: 1,
     lastEvent: template === 'SMALL' ? 'Kleine Bude eröffnet. Ein Automat steht gratis.' : 'Neues Haus eröffnet.',
     guardsHired: 0,
   };
@@ -171,6 +192,7 @@ export function ensureStarter(world: WorldState): void {
   world.furniture.push({
     id: world.nextFurnitureId++, kind: 'SLOT', gameId: 'SLOT', x: 16, y: 6, w: def.w, h: def.h, seats: def.seats,
     label: def.name, price: fromVC(0), quality: def.quality, condition: 100, damaged: false, dirt: 0,
+    stock: 0, clog: 0, clogged: false,
     zoneId: 'gaming', occupants: [], mods: [], reels: 3, baseBet: def.baseBet,
   });
 }

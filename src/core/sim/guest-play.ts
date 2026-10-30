@@ -5,6 +5,8 @@ import { playAction } from '../games/contracts';
 import type { Prng } from '../rng/prng';
 import { clamp, releaseAndChoose } from './guest-core';
 import { chooseActivity } from './guest-choice';
+import { deliverDrink, useToilet } from './deliveries';
+import { refreshNeeds } from './needs';
 import { guestAccount, HAUSKONTO, payOut, placeBet, SHOP } from './money';
 import { modEffects } from './offers';
 import { getPersona } from './personas';
@@ -52,7 +54,8 @@ function playSpin(world: WorldState, ledger: Ledger, prng: Prng, guest: Guest, i
   if (prng.nextFloat() < 0.07) world.dirty.add((guest.position.y * world.size + guest.position.x) | 0);
   if (guest.stateTicks >= 6 || guest.patience <= 0) {
     releaseAndChoose(world, guest);
-    guest.need = guest.mood < 50 ? 'drink' : 'play';
+    refreshNeeds(guest);
+    if (guest.need === 'play' && guest.mood < 50) guest.need = 'drink';
   }
 }
 
@@ -60,14 +63,13 @@ export function actAtTarget(world: WorldState, ledger: Ledger, prng: Prng, guest
   if (guest.state === 'PLAY') { playSpin(world, ledger, prng, guest, item); return; }
   if (guest.state === 'DRINK') {
     if (guest.stateTicks === 0) {
-      const wallet = ledger.getBalance(guestAccount(guest.id));
-      if (canAfford(wallet, world.prices.drinkPrice)) {
-        try { ledger.transfer(guestAccount(guest.id), HAUSKONTO, world.prices.drinkPrice, 'getraenk', world.tick); } catch { /* egal */ }
-        guest.mood = clamp(guest.mood + 12);
-        guest.patience = clamp(guest.patience + 9);
+      if (deliverDrink(world, ledger, guest, item)) {
         if (guest.spins > 0) guest.addiction = clamp(guest.addiction + 1.2 * getPersona(guest.persona).addictionRate);
         guest.dirtTimer += 1;
         if (guest.dirtTimer > 4) { world.dirty.add((guest.position.y * world.size + guest.position.x) | 0); guest.dirtTimer = 0; }
+        const served = world.agents.some((agent) => agent.role === 'bartender'
+          && Math.abs(agent.x - item.x) + Math.abs(agent.y - item.y) <= 4);
+        if (served) guest.stateTicks += 2;
       }
     }
     guest.stateTicks += 1;
@@ -75,10 +77,7 @@ export function actAtTarget(world: WorldState, ledger: Ledger, prng: Prng, guest
     return;
   }
   if (guest.state === 'TOILET') {
-    if (guest.stateTicks === 0) {
-      guest.mood = clamp(guest.mood + 7);
-      guest.patience = clamp(guest.patience + 14);
-    }
+    if (guest.stateTicks === 0) useToilet(world, guest, item);
     guest.stateTicks += 1;
     if (guest.stateTicks > 2) releaseAndChoose(world, guest);
     return;

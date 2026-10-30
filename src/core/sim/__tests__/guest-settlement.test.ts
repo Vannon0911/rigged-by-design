@@ -56,6 +56,9 @@ describe('Umbau', () => {
   it('laesst beim Template-Wechsel kein verwaistes Konto und kein Restgeld zurueck', () => {
     const { world, ledger, guest } = fundedGuest();
     ledger.transfer('EXTERNAL_WORLD', HAUSKONTO, fromVC(200), 'baukapital', 0);
+    world.day = 4;
+    world.reputation = 40;
+    world.guestsServed = 30;
     const before = ledger.getBalance(HAUSKONTO);
     const next = remodel(world, ledger, 'MEDIUM', 5);
     expect(next.template).toBe('MEDIUM');
@@ -69,6 +72,9 @@ describe('Umbau', () => {
   it('bricht den Umbau ab, wenn die Abrechnung scheitert, und laesst das Hauskonto unberuehrt', () => {
     const { world, ledger, guest } = fundedGuest();
     ledger.transfer('EXTERNAL_WORLD', HAUSKONTO, fromVC(200), 'baukapital', 0);
+    world.day = 4;
+    world.reputation = 40;
+    world.guestsServed = 30;
     const before = ledger.getBalance(HAUSKONTO);
     const spy = vi.spyOn(ledger, 'transfer').mockImplementation(() => { throw new Error('Kasse klemmt'); });
     expect(() => remodel(world, ledger, 'MEDIUM', 5)).toThrow();

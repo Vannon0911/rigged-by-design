@@ -11,7 +11,7 @@ export interface FloorHandle {
 
 interface Props {
   readonly view: GameView;
-  readonly placing: boolean;
+  readonly placing: string | null;
   readonly onGuest: (id: number) => void;
   readonly onFurniture: (id: number) => void;
   readonly onEmpty: (x: number, y: number) => void;
