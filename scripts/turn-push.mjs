@@ -1,18 +1,21 @@
 #!/usr/bin/env node
-/** Turn-Abschluss: verify:all, deutscher Steam-Notes-Commit, sofortiger Push. */
+/** Turn-Abschluss: verify:all, deutscher Steam-Notes-Commit, Push nach main. */
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fail, ROOT } from './lib/report.mjs';
 
 const git = (args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
+const TARGET_BRANCH = 'main';
 const verify = spawnSync('npm', ['run', 'verify:all'], { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
 if (verify.status !== 0) {
   fail(1, 'ERR-4006', 'turn:finish', 'verify:all ist rot; kein Commit und kein Push');
   process.exit(1);
 }
 
-git(['add', '-A']);
+const paths = process.argv.slice(2);
+if (paths.length > 0) git(['add', '--', ...paths]);
+else git(['add', '-u']);
 const staged = git(['diff', '--cached', '--name-only']);
 if (!staged) {
   console.log('turn:finish: keine Aenderungen zu committen');
@@ -52,9 +55,15 @@ if (gate.status !== 0) {
 
 git(['commit', '-F', messageFile]);
 console.log(`turn:finish: Commit ${git(['rev-parse', '--short', 'HEAD'])} erstellt`);
-const push = spawnSync('git', ['push', '-u', 'origin', 'HEAD'], { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
-if (push.status !== 0) {
-  fail(1, 'ERR-4008', 'turn:finish', 'Push auf den aktuellen Branch fehlgeschlagen');
+const pushMain = spawnSync('git', ['push', 'origin', `HEAD:${TARGET_BRANCH}`], { cwd: ROOT, stdio: 'inherit' });
+if (pushMain.status === 0) {
+  console.log(`turn:finish: PASS, ${TARGET_BRANCH} gepusht`);
+  process.exit(0);
+}
+const pushBranch = spawnSync('git', ['push', '-u', 'origin', 'HEAD'], { cwd: ROOT, stdio: 'inherit' });
+if (pushBranch.status !== 0) {
+  fail(1, 'ERR-4008', 'turn:finish', `Push auf ${TARGET_BRANCH} und auf den Arbeitsbranch fehlgeschlagen`);
   process.exit(1);
 }
-console.log('turn:finish: PASS, aktueller Branch gepusht');
+fail(1, 'ERR-4008', 'turn:finish', `Direkter Push auf ${TARGET_BRANCH} abgelehnt; Branch gepusht. Fokussierter PR gegen ${TARGET_BRANCH} noetig`);
+process.exit(1);

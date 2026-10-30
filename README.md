@@ -113,7 +113,9 @@ npm run verify:all
 
 Die Fail-Closed-Pipeline führt Autofix, ESLint, LOC-Guard, Typecheck, Testvertrag, Dead-Export-Gate, Dependency-Matrix, `npm audit`, Vitest und Production-Build aus. Jede Fehlermeldung hat das Format `[IDX-XXXX] [ERR-YYYY] Komponente: Klartext`; neue Fehlerarten stehen in [docs/ERROR_CATALOG.md](docs/ERROR_CATALOG.md).
 
-**Delivery-Regel:** Nach jedem abgeschlossenen Arbeits-Turn wird ungefragt auf den aktuellen Branch gepusht. Der verbindliche Weg ist `npm run turn:finish` — Autofix, alle Gates, deutscher Steam-Developer-Notes-Commit ohne Drittanbieter-Trailer, sofortiger Push. Details in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+**Delivery-Regel:** Nach jedem abgeschlossenen Arbeits-Turn wird auf `main` geliefert. Der verbindliche Weg ist `npm run turn:finish -- <pfade>` — Autofix, alle Gates, deutscher Steam-Developer-Notes-Commit ohne Drittanbieter-Trailer, Push auf `main`. Gestaged werden nur die genannten Pfade; ohne Argumente nur bereits verfolgte Änderungen, nie der ganze Arbeitsbaum. Lehnt der Branch-Schutz den Direktpush ab, wird der Arbeitsbranch gepusht und ein fokussierter PR gegen `main` fällig. Details in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+**Geschwindigkeit getrennt:** `npm run test:perf` misst den Durchsatz der Spielrunden (fester Seed, feste Rundenanzahl, ms/op). Der Benchmark gehört bewusst nicht zu `verify:all` und wird auf langsamer Hardware nicht rot.
 
 ## Tests
 

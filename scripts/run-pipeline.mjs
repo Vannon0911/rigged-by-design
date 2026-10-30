@@ -15,14 +15,16 @@ const steps = [
   ['build', 'npm', ['run', 'build'], 'ERR-1005'],
 ];
 
+let failed = 0;
+let index = 0;
+
 console.log('=== ERR-0911 Autofix ===');
 const autofix = spawnSync(process.execPath, ['scripts/autofix-0911.mjs'], { cwd: ROOT, stdio: 'inherit' });
 if (autofix.status !== 0) {
-  console.error(line(1, 'ERR-0911', 'pipeline', 'Autofix konnte nicht vollstaendig laufen'));
+  failed += 1;
+  index += 1;
+  console.error(line(index, 'ERR-0911', 'pipeline', 'Autofix konnte nicht vollstaendig laufen'));
 }
-
-let failed = 0;
-let index = 0;
 for (const [name, command, args, code] of steps) {
   console.log(`=== Gate: ${name} ===`);
   const result = spawnSync(command, args, { cwd: ROOT, stdio: 'inherit', shell: command === 'npm' && process.platform === 'win32' });

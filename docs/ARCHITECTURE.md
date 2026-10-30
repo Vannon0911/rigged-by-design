@@ -18,6 +18,8 @@
 
 ## Pipeline
 
+Ein fehlgeschlagenes Autofix zählt als rotes Gate und beendet die Pipeline mit Nicht-Null-Exit.
+
 `npm run verify:all` führt in dieser Reihenfolge aus:
 
 1. `autofix:0911` (ESLint-Fix, Dependency-Matrix, Commit-Sanitizing)
@@ -51,15 +53,17 @@ Jede Laufzeit- und Entwicklungabhängigkeit braucht eine nicht-leere Begründung
 | typescript | ^5.7.3 | Build | Strikte Typpruefung mit noUncheckedIndexedAccess und ungenutzten Symbolen. | 1: `tsconfig.json` |
 | typescript-eslint | ^8.72.1 | Lint | TypeScript-Parser und Regeln fuer das Lint-Gate. | 1: `eslint.config.mjs` |
 | vite | ^6.0.7 | Build | Dev-Server und Production-Bundler; liefert die Modul- und CSS-Pipeline. | 1: `package.json` |
-| vitest | ^5.0.5 | Test | Deterministische Unit- und Monte-Carlo-Beweise fuer Ledger, Spiele und Simulation. | 8: `package.json`<br>`src/core/economy/__tests__/economy.test.ts`<br>`src/core/games/__tests__/round.test.ts`<br>`src/core/governance/__tests__/dependency-governance.test.ts`<br>`src/core/governance/test-harness.ts`<br>`src/core/sim/__tests__/grid-zones.test.ts`<br>… (+2) |
+| vitest | ^5.0.5 | Test | Deterministische Unit- und Monte-Carlo-Beweise fuer Ledger, Spiele und Simulation. | 9: `package.json`<br>`src/core/economy/__tests__/economy.test.ts`<br>`src/core/games/__tests__/round.bench.ts`<br>`src/core/games/__tests__/round.test.ts`<br>`src/core/governance/__tests__/dependency-governance.test.ts`<br>`src/core/governance/test-harness.ts`<br>… (+3) |
 <!-- DEP_MATRIX_END -->
 
 ## Delivery-Regel
 
-**Nach jedem abgeschlossenen Arbeits-Turn MUSS ungefragt auf den aktuellen Branch gepusht werden.** Der verbindliche Weg ist:
+**Nach jedem abgeschlossenen Arbeits-Turn wird auf `main` geliefert.** Der verbindliche Weg ist:
 
 ```bash
 npm run turn:finish
 ```
 
-`turn:finish` führt Autofix und `verify:all` aus, erzeugt bei Änderungen einen Commit im deutschen Steam-Developer-Notes-Format (ohne Drittanbieter-Trailer) und pusht sofort auf den aktuellen Branch. Ein fehlgeschlagenes Gate verhindert Commit und Push.
+`turn:finish` führt Autofix und `verify:all` aus, erzeugt bei Änderungen einen Commit im deutschen Steam-Developer-Notes-Format (ohne Drittanbieter-Trailer) und pusht auf `main`. Gestaged werden nur die übergebenen Pfade; ohne Argumente ausschließlich bereits verfolgte Änderungen, damit kein fremder oder unverfolgter Inhalt mitgeht. Ein fehlgeschlagenes Gate verhindert Commit und Push. Lehnt der Branch-Schutz den Direktpush ab, wird der Arbeitsbranch gepusht und ein fokussierter PR gegen `main` nötig.
+
+Der Geschwindigkeits-Benchmark läuft separat über `npm run test:perf` und ist absichtlich nicht Teil von `verify:all`: Er misst Durchsatz und ist kein Korrektheitsgate.

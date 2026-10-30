@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:ci": "vitest run",
+    "test:perf": "vitest bench --run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "check:loc": "node scripts/check-loc.mjs",

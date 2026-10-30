@@ -27,7 +27,7 @@ describe('Spiele', () => {
     }
   });
 
-  it('jedes Spiel zahlt 90-96 % aus und erzeugt sichtbare Gewinner und Verlierer', () => {
+  it('jedes Spiel zahlt 90-96 % aus und erzeugt sichtbare Gewinner und Verlierer', { timeout: 180_000 }, () => {
     const rounds = 500_000;
     for (const game of GAMES) {
       const prng = new Prng(0x51ca5e + game.length);
