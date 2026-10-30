@@ -47,6 +47,12 @@ Jede Buchung läuft über das Ledger. Es gibt kein `addVC` außerhalb einer Buch
 
 Mitgebrachtes Fiat liegt ab dem Spawn als eigenes Konto (`FIAT_<id>`) im Ledger, nicht mehr im Gastobjekt. Eine Auszahlung wird nie still gekappt: Was das Hauskonto nicht deckt, steht als gebuchte Schuld auf `HAUS_SCHULDEN` und der Gast bekommt trotzdem seine volle Summe.
 
+## Zufall
+
+Alle Spiele ziehen über **[src/core/rng/weighted.ts](src/core/rng/weighted.ts)**: `buildDistribution` legt die Gewichte einmalig fest, `rollNumber` liefert Rohwert, wirksamen Wert, angewendeten Bias und die Chance genau dieses Werts — die Anzeige stammt aus derselben Verteilung, aus der gezogen wird. Der Bias ist hart begrenzt (`strengthBps` ≤ 9.000, Ziel höchstens 10,99-fach gewichtet, Deadzones sperren Werte); ein einzelner Wert kann nie zur sicheren Bank werden.
+
+Karten laufen über den Schuh in **[src/core/rng/shoe.ts](src/core/rng/shoe.ts)**: Jede Ziehung entfernt die Karte, erst ein leerer Schuh wird neu gemischt. Deshalb kann ein Blatt keine Karte doppelt enthalten. Die Poker-Paytable ist auf die echten Fünf-Karten-Häufigkeiten aus 52 Karten geeicht und hält den RTP im 90–96-%-Band.
+
 ## Spiele
 
 Sieben Spiele mit unterschiedlichen Charakteren: **Book-of-Ra-Slot, Plinko, Blackjack, Video Poker, Roulette, Hütchenspiel und Würfel**. Am eigenen Automaten gibt es nur den **kostenlosen Testspin** – der Betreiber spielt nicht gegen sein eigenes Haus. In fremden Häusern wird mit richtigem Portemonnaie-Geld gespielt, inklusive optionalem Vollbild.

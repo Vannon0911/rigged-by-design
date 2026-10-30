@@ -11,6 +11,8 @@
 - Auszahlungen werden nie gekappt: Das Hauskonto zahlt, so weit es reicht; der Rest wird als Verbindlichkeit auf `HAUS_SCHULDEN` gebucht (`openLiability`). Die Summe aller Konten bleibt null.
 - Der Umbau läuft über `src/core/sim/remodel.ts`: erst Deckung prüfen, dann alle Gastansprüche buchen, dann Geld buchen und das Haus tauschen.
 - Der Save ist v6; `replaySave` hebt v5-Stände beim Laden an und bucht damaliges Fiat als Konto nach.
+- Zufall ist seedbar und läuft ausschließlich über `src/core/rng/`: `weighted.ts` zieht Zahlen aus einer Gewichtsverteilung, die ihre eigenen Chancen mitliefert (Bias ≤ 9.000 bps, Deadzones, nie 100 %); `shoe.ts` zieht Karten ohne Zurücklegen und mischt erst den leeren Schuh neu. `playRound` in `src/core/games/round.ts` ist der einzige Verbraucher; es gibt kein `Math.random()` im Spielpfad.
+- Der PRNG-Zustand (`prngState`) liegt im Save. `replaySave` zieht selbst nichts, deshalb setzt die Folge nach dem Laden exakt an der gespeicherten Stelle fort.
 
 ## Fehler-Governance
 
@@ -57,7 +59,7 @@ Jede Laufzeit- und Entwicklungabhängigkeit braucht eine nicht-leere Begründung
 | typescript | ^5.7.3 | Build | Strikte Typpruefung mit noUncheckedIndexedAccess und ungenutzten Symbolen. | 1: `tsconfig.json` |
 | typescript-eslint | ^8.72.1 | Lint | TypeScript-Parser und Regeln fuer das Lint-Gate. | 1: `eslint.config.mjs` |
 | vite | ^6.0.7 | Build | Dev-Server und Production-Bundler; liefert die Modul- und CSS-Pipeline. | 1: `package.json` |
-| vitest | ^5.0.5 | Test | Deterministische Unit- und Monte-Carlo-Beweise fuer Ledger, Spiele und Simulation. | 12: `package.json`<br>`src/core/economy/__tests__/economy.test.ts`<br>`src/core/games/__tests__/round.bench.ts`<br>`src/core/games/__tests__/round.test.ts`<br>`src/core/governance/__tests__/dependency-governance.test.ts`<br>`src/core/governance/test-harness.ts`<br>… (+6) |
+| vitest | ^5.0.5 | Test | Deterministische Unit- und Monte-Carlo-Beweise fuer Ledger, Spiele und Simulation. | 15: `package.json`<br>`src/core/economy/__tests__/economy.test.ts`<br>`src/core/games/__tests__/round.bench.ts`<br>`src/core/games/__tests__/round.test.ts`<br>`src/core/governance/__tests__/dependency-governance.test.ts`<br>`src/core/governance/test-harness.ts`<br>… (+9) |
 <!-- DEP_MATRIX_END -->
 
 ## Delivery-Regel

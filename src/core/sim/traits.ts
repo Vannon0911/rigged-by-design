@@ -1,6 +1,7 @@
 /** Gast-Erzeugung: Persona plus zufaellig verteilter Max-Pool fuer Laune, Geduld und Sucht. */
 import { fromVC, type VaCoinMicro } from '../economy/vacoin';
 import type { Prng } from '../rng/prng';
+import { pickWeighted } from '../rng/weighted';
 import { getPersona, personasForTier } from './personas';
 import type { Guest, PersonaId, Point, TemplateId } from './types';
 
@@ -25,13 +26,8 @@ function splitPool(prng: Prng): [number, number, number] {
 
 export function randomPersona(prng: Prng, template: TemplateId): PersonaId {
   const pool = personasForTier(TIER[template]);
-  const total = pool.reduce((sum, persona) => sum + PERSONA_WEIGHT[persona.id], 0);
-  let roll = prng.nextInt(1, total);
-  for (const persona of pool) {
-    roll -= PERSONA_WEIGHT[persona.id];
-    if (roll <= 0) return persona.id;
-  }
-  return pool[0]!.id;
+  const picked = pickWeighted(prng, pool.map((persona) => ({ item: persona, weight: PERSONA_WEIGHT[persona.id] })));
+  return picked?.id ?? pool[0]!.id;
 }
 
 export function randomFiat(prng: Prng, template: TemplateId, personaId: PersonaId): VaCoinMicro {

@@ -3,6 +3,7 @@ import type { Ledger } from '../economy/ledger';
 import type { VaCoinMicro } from '../economy/vacoin';
 import { blockedTiles, nearestWalkable } from './pathfinding';
 import type { Prng } from '../rng/prng';
+import { pickWeighted } from '../rng/weighted';
 import { clamp } from './guest-core';
 import { becomeAngry } from './guest-service';
 import { guestAccount } from './money';
@@ -51,16 +52,10 @@ function waitForSpace(world: WorldState, guest: Guest): void {
 function tryGame(world: WorldState, guest: Guest, wallet: VaCoinMicro, prng: Prng): boolean {
   const candidates = world.furniture
     .filter((item) => item.gameId && !item.damaged && item.condition >= 18 && freeSeat(item))
-    .map((item) => ({ item, score: offerScore(world, guest, item, wallet) }))
-    .filter((entry) => entry.score > 0);
-  const total = candidates.reduce((sum, entry) => sum + entry.score, 0);
-  if (total <= 0) return false;
-  let roll = prng.nextFloat() * total;
-  for (const entry of candidates) {
-    roll -= entry.score;
-    if (roll <= 0 && startActivity(world, guest, entry.item)) return true;
-  }
-  return false;
+    .map((item) => ({ item, weight: offerScore(world, guest, item, wallet) }))
+    .filter((entry) => entry.weight > 0);
+  const chosen = pickWeighted(prng, candidates, (item) => startActivity(world, guest, item));
+  return chosen !== null;
 }
 
 export function chooseActivity(world: WorldState, guest: Guest, ledger: Ledger, prng: Prng): void {

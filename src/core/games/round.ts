@@ -1,6 +1,8 @@
 /** Kompakte, deterministische Runden fuer alle Spiele. Auszahlung in Basispunkten (10000 = 1x). */
 import type { GameId } from '../sim/types';
 import type { Prng } from '../rng/prng';
+import { createShoe, type Card } from '../rng/shoe';
+import { buildDistribution, rollNumber } from '../rng/weighted';
 
 export interface RoundResult {
   readonly game: GameId;
@@ -19,13 +21,20 @@ const SLOT_TRIPLE_BPS: Readonly<Record<string, number>> = {
   BLANK: 90_000,
 };
 
+/** Alle Spiele ziehen ueber denselben Vertrag; die Chance kommt aus derselben Verteilung. */
+const SLOT_REEL = buildDistribution(0, SLOT_SYMBOLS.length - 1);
+const ROULETTE_NUMBER = buildDistribution(0, 36);
+const COIN_FLIP = buildDistribution(0, 1);
+const SHELL_POSITION = buildDistribution(0, 2);
+const DIE = buildDistribution(1, 6);
+
 /** 10000 -> "1x", 14500 -> "1,45x". Nur fuer Anzeige. */
 function multiplier(bps: number): string {
   return `${parseFloat((bps / 10_000).toFixed(2))}x`.replace('.', ',');
 }
 
 function slot(prng: Prng): RoundResult {
-  const reels = [0, 1, 2].map(() => SLOT_SYMBOLS[prng.nextInt(0, SLOT_SYMBOLS.length - 1)]!);
+  const reels = [0, 1, 2].map(() => SLOT_SYMBOLS[rollNumber(prng, SLOT_REEL).value]!);
   const [a = 'BLANK', b = 'BLANK', c = 'BLANK'] = reels;
   const triple = a === b && b === c;
   const pair = a === b || b === c;
@@ -34,14 +43,13 @@ function slot(prng: Prng): RoundResult {
   return { game: 'SLOT', multiplierBps: bps, label, detail: reels };
 }
 
-function card(prng: Prng): string {
-  const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-  return `${ranks[prng.nextInt(0, 12)]!}${['♠', '♥', '♦', '♣'][prng.nextInt(0, 3)]!}`;
-}
+/** Karten kommen aus dem Schuh; ein Blatt kann keine Karte doppelt enthalten. */
+const cardLabel = (card: Card): string => `${card.rank}${card.suit}`;
 
 function blackjack(prng: Prng): RoundResult {
-  const hand = [card(prng), card(prng)];
-  const dealer = [card(prng), card(prng)];
+  const shoe = createShoe(prng);
+  const hand = [cardLabel(shoe.draw()), cardLabel(shoe.draw())];
+  const dealer = [cardLabel(shoe.draw()), cardLabel(shoe.draw())];
   const value = (cards: string[]): number => cards.reduce((sum, entry) => {
     const rank = entry.slice(0, -1);
     return sum + (rank === 'A' ? 11 : ['J', 'Q', 'K'].includes(rank) ? 10 : Number(rank));
@@ -54,18 +62,21 @@ function blackjack(prng: Prng): RoundResult {
 }
 
 function poker(prng: Prng): RoundResult {
-  const hand = [0, 1, 2, 3, 4].map(() => card(prng));
+  const shoe = createShoe(prng);
+  const hand = Array.from({ length: 5 }, () => cardLabel(shoe.draw()));
   const ranks = hand.map((entry) => entry.slice(0, -1));
   const counts = new Map<string, number>();
   for (const rank of ranks) counts.set(rank, (counts.get(rank) ?? 0) + 1);
   const max = Math.max(...counts.values());
   const pairs = [...counts.values()].filter((count) => count === 2).length;
   const flush = new Set(hand.map((entry) => entry.slice(-1))).size === 1;
-  const bps = max >= 4 ? 300_000
-    : max === 3 ? 35_000
-      : pairs === 2 ? 22_000
-        : flush ? 80_000
-          : max === 2 ? 11_500
+  // Auf die echten Fuenf-Karten-Haeufigkeiten des Schuhs geeicht (Paar 42,3 %,
+  // zwei Paare 4,75 %, Drilling/Full House 2,26 %, Flush 0,20 %, Vierling 0,02 %).
+  const bps = max >= 4 ? 400_000
+    : max === 3 ? 60_000
+      : pairs === 2 ? 30_000
+        : flush ? 90_000
+          : max === 2 ? 15_000
             : 0;
   const label = max >= 4 ? `Vierling ${multiplier(bps)}`
     : max === 3 ? `Drilling/Full House ${multiplier(bps)}`
@@ -77,7 +88,7 @@ function poker(prng: Prng): RoundResult {
 }
 
 function roulette(prng: Prng): RoundResult {
-  const number = prng.nextInt(0, 36);
+  const number = rollNumber(prng, ROULETTE_NUMBER).value;
   const red = RED.has(number);
   // Fester Satz auf Rot: 18 von 37 Feldern; 1,95x statt 2x haelt die RTP bei 94,9 %.
   const win = number !== 0 && red;
@@ -88,7 +99,7 @@ function roulette(prng: Prng): RoundResult {
 
 function plinko(prng: Prng): RoundResult {
   let slot = 0;
-  for (let row = 0; row < 8; row += 1) slot += prng.nextInt(0, 1);
+  for (let row = 0; row < 8; row += 1) slot += rollNumber(prng, COIN_FLIP).value;
   const table = [200_000, 40_000, 14_500, 4_000, 2_000, 4_000, 14_500, 40_000, 200_000];
   const bps = table[slot] ?? 0;
   return {
@@ -100,7 +111,7 @@ function plinko(prng: Prng): RoundResult {
 }
 
 function shell(prng: Prng): RoundResult {
-  const win = prng.nextInt(0, 2) === 0;
+  const win = rollNumber(prng, SHELL_POSITION).value === 0;
   return {
     game: 'SHELL',
     multiplierBps: win ? 28_500 : 0,
@@ -110,8 +121,8 @@ function shell(prng: Prng): RoundResult {
 }
 
 function dice(prng: Prng): RoundResult {
-  const a = prng.nextInt(1, 6);
-  const b = prng.nextInt(1, 6);
+  const a = rollNumber(prng, DIE).value;
+  const b = rollNumber(prng, DIE).value;
   const win = a + b > 7;
   return {
     game: 'DICE',
