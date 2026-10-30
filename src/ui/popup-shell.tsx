@@ -1,7 +1,7 @@
 /** Ein Rahmen für alle Popups: Backdrop, Titel, Escape, Schließen. */
 import { useEffect, type ReactNode } from 'react';
 
-export interface PopupShellProps {
+interface PopupShellProps {
   readonly eyebrow: string;
   readonly title: string;
   readonly onClose: () => void;

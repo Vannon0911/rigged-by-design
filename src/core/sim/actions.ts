@@ -49,16 +49,21 @@ export function serveDrink(world: WorldState, ledger: Ledger, guestId: number): 
   }
   guest.mood = Math.min(100, guest.mood + 13);
   guest.patience = Math.min(100, guest.patience + 12);
-  guest.addiction = Math.min(100, guest.addiction + 1);
-  guest.bubble = 'Danke, Chef.';
+  // Nur wer schon gespielt hat, koppelt den Drink an den Kick; sonst wird niemand vom Zuschauen süchtig.
+  if (guest.spins > 0) guest.addiction = Math.min(100, guest.addiction + 2);
   world.player.carrying = '';
   world.lastEvent = `${guest.name} hat einen Drink bekommen.`;
 }
 
-export function payGuest(ledger: Ledger, guestId: number, tick: number): VaCoinMicro {
+export function payGuest(world: WorldState, ledger: Ledger, guestId: number, tick: number): VaCoinMicro {
   const amount = ledger.getBalance(`PENDING_${guestId}`);
   if (amount <= ZERO_VC) return ZERO_VC;
   ledger.transfer(`PENDING_${guestId}`, `VISITOR_${guestId}`, amount, `gast ${guestId} auszahlung`, tick);
+  const guest = guestById(world, guestId);
+  if (guest) {
+    guest.mood = Math.min(100, guest.mood + 6);
+    guest.patience = Math.min(100, guest.patience + 5);
+  }
   return amount;
 }
 
@@ -78,10 +83,10 @@ export function cleanAll(world: WorldState, ledger: Ledger): number {
 
 export function repair(world: WorldState, ledger: Ledger, itemId: number): void {
   const item = furnitureById(world, itemId);
-  if (!item || item.condition >= 100) return;
-  const cost = (world.prices.repairCost * (100 - Math.floor(item.condition))) as VaCoinMicro;
-  ledger.transfer(HAUSKONTO, SHOP, cost, 'reparatur', world.tick);
+  if (!item || (item.condition >= 100 && !item.damaged)) return;
+  ledger.transfer(HAUSKONTO, SHOP, world.prices.repairCost, 'reparatur', world.tick);
   item.condition = 100;
+  item.damaged = false;
 }
 
 export function hire(world: WorldState, ledger: Ledger, role: 'guard' | 'cleaner' | 'bartender'): void {
@@ -109,13 +114,13 @@ export function setCarpet(world: WorldState, carpet: CarpetId): void {
 
 export function build(world: WorldState, ledger: Ledger, buildId: BuildId, x: number, y: number): Furniture {
   const def = getBuildDef(buildId);
-  if (!canPlace(world, x, y, def.w, def.h)) throw new Error('Da ist kein Platz.');
+  if (!canPlace(world, x, y, def.w, def.h, def.seats > 0)) throw new Error('Da ist kein Platz.');
   ledger.transfer(HAUSKONTO, SHOP, def.cost, `kauf ${def.name}`, world.tick);
   const zone = world.zones.find((entry) =>
     x >= entry.x && y >= entry.y && x < entry.x + entry.w && y < entry.y + entry.h);
   const item: Furniture = {
     id: world.nextFurnitureId++, kind: def.kind, gameId: def.gameId, x, y, w: def.w, h: def.h,
-    seats: def.seats, label: def.name, price: def.cost, quality: def.quality, condition: 100,
+    seats: def.seats, label: def.name, price: def.cost, quality: def.quality, condition: 100, damaged: false,
     dirt: 0, zoneId: zone?.id ?? 'gaming', occupants: [], mods: [], reels: def.reels, baseBet: def.baseBet,
   };
   world.furniture.push(item);

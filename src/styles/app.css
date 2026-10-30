@@ -148,23 +148,6 @@ h3 { margin: 14px 0 7px; font-size: 11px; letter-spacing: 0.16em; text-transform
 }
 .toast:active { transform: translateX(-50%) scale(0.99); }
 
-/* ---------- Minimap ---------- */
-.minimap {
-  position: absolute; left: 12px; bottom: 12px; z-index: 13; width: 196px;
-  padding: 8px; border: 1px solid var(--line); border-radius: 12px;
-  background: rgba(6, 4, 12, 0.86); backdrop-filter: blur(4px);
-}
-.minimap-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
-.minimap-head span { font-size: 8px; letter-spacing: 0.18em; color: var(--neon); }
-.minimap-head small { font-size: 7px; color: var(--muted); }
-.minimap-map { position: relative; width: 100%; aspect-ratio: 1; border: 1px solid var(--line); border-radius: 8px; background: #0a0614; overflow: hidden; }
-.mini-zone { position: absolute; border: 1px solid rgba(255, 255, 255, 0.22); border-radius: 2px; opacity: 0.72; }
-.mini-zone:hover { opacity: 1; border-color: var(--gold); }
-.mini-guest { position: absolute; width: 3px; height: 3px; margin: -1.5px; border-radius: 50%; background: var(--neon); }
-.mini-guest.angry { background: var(--hot); width: 4px; height: 4px; margin: -2px; }
-.minimap-controls { display: flex; gap: 4px; margin-top: 6px; }
-.minimap-controls .btn { flex: 1; }
-
 /* ---------- Build panel ---------- */
 .build-panel {
   position: absolute; top: 12px; right: 12px; bottom: 12px; z-index: 35;
@@ -233,5 +216,4 @@ h3 { margin: 14px 0 7px; font-size: 11px; letter-spacing: 0.16em; text-transform
   .hud { grid-template-columns: 1fr; gap: 8px; }
   .hud-money { border-right: 0; padding-right: 0; }
   .hud-vitals, .hud-actions { flex-wrap: wrap; }
-  .minimap { width: 150px; }
 }

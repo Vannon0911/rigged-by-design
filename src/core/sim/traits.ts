@@ -1,25 +1,26 @@
-/** Gast-Erzeugung: Persona plus zufaellig verteilter Max-Pool fuer Laune, Geduld, Sozialverhalten. */
+/** Gast-Erzeugung: Persona plus zufaellig verteilter Max-Pool fuer Laune, Geduld und Sucht. */
 import { fromVC, type VaCoinMicro } from '../economy/vacoin';
 import type { Prng } from '../rng/prng';
 import { getPersona, personasForTier } from './personas';
 import type { Guest, PersonaId, Point, TemplateId } from './types';
 
 const NAMES = ['Kai', 'Rita', 'Bruno', 'Nadja', 'Otis', 'Mira', 'Falk', 'Sina', 'Timo', 'Lena', 'Emil', 'Jule', 'Mika'];
-const POOL = 240;
+const LAST_NAMES = ['Vogt', 'Berger', 'Kern', 'Roth', 'Adler', 'Busch', 'Dorn', 'Fink', 'Held', 'Kraus'];
+const POOL = 200;
 const TIER: Record<TemplateId, 1 | 2 | 3> = { SMALL: 1, MEDIUM: 2, LARGE: 3 };
 const PERSONA_WEIGHT: Record<PersonaId, number> = {
   LUMPEN: 4, STREET: 4, BUSINESS: 2, HIGH_ROLLER: 1, STAMMGAST: 3,
 };
 
-/** Verteilt den Pool auf drei Stats: jeder 30..100, zusammen exakt 240. */
+/** Verteilt exakt 200 Punkte auf die drei Kernwerte; jeder bleibt in 0..100. */
 function splitPool(prng: Prng): [number, number, number] {
-  for (let attempt = 0; attempt < 24; attempt += 1) {
-    const mood = prng.nextInt(30, 100);
-    const patience = prng.nextInt(30, 100);
-    const social = POOL - mood - patience;
-    if (social >= 30 && social <= 100) return [mood, patience, social];
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const mood = prng.nextInt(0, 100);
+    const patience = prng.nextInt(0, 100);
+    const addiction = POOL - mood - patience;
+    if (addiction >= 0 && addiction <= 100) return [mood, patience, addiction];
   }
-  return [80, 80, 80];
+  return [70, 70, 60];
 }
 
 export function randomPersona(prng: Prng, template: TemplateId): PersonaId {
@@ -47,16 +48,16 @@ export function makeGuest(input: {
   spawn: Point;
 }): Guest {
   const persona = getPersona(input.persona);
-  const [moodBase, patienceBase, social] = splitPool(input.prng);
+  const [mood, patience, addiction] = splitPool(input.prng);
   return {
     id: input.id,
-    name: `${NAMES[input.prng.nextInt(0, NAMES.length - 1)]!} ${input.id}`,
+    name: `${NAMES[input.prng.nextInt(0, NAMES.length - 1)]!} ${LAST_NAMES[input.prng.nextInt(0, LAST_NAMES.length - 1)]!}`,
     persona: persona.id,
     fiat: input.fiat,
-    mood: Math.min(100, Math.round(moodBase * 0.85 + 12)),
-    patience: Math.min(100, Math.round((patienceBase * 0.75 + 25) * (persona.patience / 100))),
-    addiction: input.prng.nextInt(0, 9),
-    sociability: social,
+    mood,
+    patience,
+    addiction,
+    sociability: input.prng.nextInt(30, 100),
     state: 'ENTER',
     stateTicks: 0,
     position: { ...input.spawn },
@@ -66,7 +67,6 @@ export function makeGuest(input: {
     targetZone: 'entrance',
     queueIndex: 0,
     need: 'play',
-    bubble: 'Ich will spielen.',
     anger: 0,
     dirtTimer: 0,
     lastResult: '',

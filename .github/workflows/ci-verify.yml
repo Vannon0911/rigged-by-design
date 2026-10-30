@@ -16,30 +16,30 @@ concurrency:
 
 jobs:
   verify:
-    name: Quality Gates 1-4
+    name: Fail-Closed Gates
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Node 22 mit npm-Cache
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '22.12'
           cache: npm
 
       - name: Install (npm ci)
         run: npm ci
 
-      - name: 'Gate 1 - LOC-Guillotine'
-        run: npm run check:loc
+      - name: Commit- und PR-Notes-Gate
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          node scripts/verify-commit-msg.mjs --head
+          if [ -n "$PR_BODY" ]; then node scripts/verify-commit-msg.mjs --pr; fi
 
-      - name: 'Gate 2 - Type-Safety'
-        run: npm run typecheck
-
-      - name: 'Gate 3 - RNG-, Ledger- & Regel-Beweise'
-        run: npm run test:ci
-
-      - name: 'Gate 4 - Production Build'
-        run: npm run build
+      - name: Autofix + alle Fail-Closed-Gates
+        run: npm run verify:all

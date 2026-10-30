@@ -1,5 +1,6 @@
 /** Fremdes Haus: hier bist du Gast. Nur hier wird echtes Portemonnaie-Geld gesetzt. */
 import { useState } from 'react';
+import { HOUSE_FLOAT } from '../core/sim/money';
 import type { GameId } from '../core/sim/types';
 import type { GameView } from '../store/types';
 import type { ForeignResult } from '../store/world-store';
@@ -63,7 +64,7 @@ export function GamesPopup({ view, onClose, onPlay, onTakeHome }: Props) {
         <div className="foreign-wallet">
           <span>PORTEMONNAIE</span>
           <strong>{vc(view.wallet, 2)}</strong>
-          <button type="button" className="btn small" onClick={onTakeHome} disabled={view.house <= 0}>ABHEBEN</button>
+          <button type="button" className="btn small" onClick={onTakeHome} disabled={view.house <= HOUSE_FLOAT} title="Bis zu 5 VC; 5 VC bleiben als Betriebsreserve im Hauskonto.">ABHEBEN</button>
           <button type="button" className="btn small ghost" onClick={() => setFull((value) => !value)}>{full ? 'FENSTER' : 'VOLLBILD'}</button>
         </div>
       </div>

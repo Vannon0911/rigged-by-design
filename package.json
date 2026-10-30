@@ -12,7 +12,16 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "check:loc": "node scripts/check-loc.mjs",
-    "verify:all": "npm run check:loc && npm run typecheck && npm run test:ci && npm run build"
+    "verify:all": "node scripts/run-pipeline.mjs",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "audit:gate": "npm audit --audit-level=low",
+    "verify:test-quality": "node scripts/verify-test-quality.mjs",
+    "verify:dead-code": "node scripts/verify-dead-code.mjs",
+    "verify:commit-msg": "node scripts/verify-commit-msg.mjs --head",
+    "sync:deps": "node scripts/sync-dependency-matrix.mjs",
+    "autofix:0911": "node scripts/autofix-0911.mjs",
+    "turn:finish": "node scripts/turn-push.mjs"
   },
   "dependencies": {
     "pixi.js": "^8.6.6",
@@ -20,11 +29,16 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.6.6",
     "@types/react": "^19.0.7",
     "@types/react-dom": "^19.0.3",
     "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^10.13.0",
+    "globals": "^16.5.0",
     "typescript": "^5.7.3",
+    "typescript-eslint": "^8.72.1",
     "vite": "^6.0.7",
-    "vitest": "^3.0.5"
+    "vitest": "^5.0.5"
   }
 }

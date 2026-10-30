@@ -5,14 +5,6 @@ export function vc(micro: number, digits = 2): string {
   return `${value.toFixed(digits)} VC`;
 }
 
-export function vcShort(micro: number): string {
-  return vc(micro, Math.abs(micro) < 100 ? 2 : 0);
-}
-
-export function pct(value: number): string {
-  return `${Math.round(value)}%`;
-}
-
 export const STATE_LABEL: Record<string, string> = {
   ENTER: 'kommt rein',
   EXCHANGE: 'wechselt Geld',

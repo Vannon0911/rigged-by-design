@@ -1,5 +1,5 @@
 /** Boden, Zonen und Dreck: wenige Formen statt tausender Tiles, damit 90x90 fluessig bleibt. */
-import type { Graphics, Text } from 'pixi.js';
+import type { Graphics } from 'pixi.js';
 import { CARPETS, REGION } from '../core/sim/types';
 import type { GameView } from '../store/types';
 
@@ -15,8 +15,8 @@ export function drawFloor(g: Graphics, view: GameView, tile: number): void {
     }
   }
   for (let step = 0; step <= view.size; step += REGION) {
-    g.rect(step * tile, 0, 2, px).fill({ color: 0xffffff, alpha: 0.05 });
-    g.rect(0, step * tile, px, 2).fill({ color: 0xffffff, alpha: 0.05 });
+    g.rect(step * tile, 0, 2, px).fill({ color: 0xffffff, alpha: 0.13 });
+    g.rect(0, step * tile, px, 2).fill({ color: 0xffffff, alpha: 0.13 });
   }
   for (const zone of view.zones) {
     g.roundRect(zone.x * tile + 3, zone.y * tile + 3, zone.w * tile - 6, zone.h * tile - 6, 10)
@@ -38,14 +38,4 @@ export function drawDirt(g: Graphics, view: GameView, tile: number): void {
     g.circle(x + 5, y - 3, 2.5).fill({ color: 0x3a2a1a, alpha: 0.8 });
     g.circle(x - 4, y + 2, 1.8).fill({ color: 0x3a2a1a, alpha: 0.6 });
   }
-}
-
-export function drawZoneLabels(labels: Text[], view: GameView, tile: number): void {
-  view.zones.forEach((zone, index) => {
-    const label = labels[index] ?? labels[0]!;
-    label.text = zone.name.toUpperCase();
-    label.position.set(zone.x * tile + 12, zone.y * tile + 10);
-    label.visible = true;
-  });
-  for (let index = view.zones.length; index < labels.length; index += 1) labels[index]!.visible = false;
 }

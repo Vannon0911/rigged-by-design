@@ -6,7 +6,7 @@ import { reputation, serviceCapacity } from '../core/sim/spawn';
 import type { WorldState } from '../core/sim/types';
 import type { GameView } from './types';
 
-export function worldSnapshot(world: WorldState) {
+function worldSnapshot(world: WorldState) {
   return {
     template: world.template,
     size: world.size,
@@ -48,8 +48,4 @@ export function buildView(world: WorldState, ledger: Ledger, notice: string): Ga
     ledgerOk: ledger.verifyLedgerIntegrity(),
     notice,
   };
-}
-
-export function guestBalance(ledger: Ledger, guestId: number): VaCoinMicro {
-  return ledger.getBalance(guestAccount(guestId));
 }

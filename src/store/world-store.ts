@@ -7,7 +7,7 @@ import {
   build, cleanAll, cleanTile, fire, foreignRound, hire, installMod, movePlayer,
   payGuest, repair, serveDrink, setBaseBet, setCarpet, setPrice, settleGuests, takeDrink, testSpin, upgradeReels,
 } from '../core/sim/actions';
-import { HAUSKONTO, playerTakeHome } from '../core/sim/money';
+import { HAUSKONTO, HOUSE_FLOAT, playerTakeHome } from '../core/sim/money';
 import type { BuildId } from '../core/sim/offers';
 import { createWorld, ensureStarter, TEMPLATE_COST } from '../core/sim/templates';
 import { tickWorld } from '../core/sim/tick';
@@ -22,7 +22,7 @@ export interface ForeignResult { readonly payout: VaCoinMicro; readonly label: s
 
 class WorldStore {
   #ledger = new Ledger();
-  #prng = new Prng(Date.now() >>> 0);
+  #prng = new Prng(Date.now() >>> 0); // @seed-initializer
   #world: WorldState = createWorld('SMALL');
   #view: GameView;
   #notice = '0,00 VC im Hauskonto. Dein erster Automat steht gratis. Gäste kommen zum Eingang.';
@@ -64,7 +64,7 @@ class WorldStore {
   newGame(template: TemplateId = 'SMALL'): void {
     this.#world = createWorld(template);
     this.#ledger = new Ledger();
-    this.#prng = new Prng((Date.now() ^ 0x9e3779b9) >>> 0);
+    this.#prng = new Prng((Date.now() ^ 0x9e3779b9) >>> 0); // @seed-initializer
     this.#notice = 'Neues Casino. Ein Automat steht gratis.';
     this.#emit();
   }
@@ -159,11 +159,11 @@ class WorldStore {
     });
   }
 
-  takeHome(amountVC = 20): void {
+  takeHome(amountVC = 5): void {
     this.#guard(() => {
-      const available = this.#ledger.getBalance(HAUSKONTO);
+      const available = (this.#ledger.getBalance(HAUSKONTO) - HOUSE_FLOAT) as VaCoinMicro;
       const amount = Math.min(fromVC(amountVC), available) as VaCoinMicro;
-      if (amount <= ZERO_VC) throw new Error('Das Hauskonto ist leer.');
+      if (amount <= ZERO_VC) throw new Error('5 VC bleiben als Betriebsreserve im Hauskonto.');
       playerTakeHome(this.#ledger, amount, this.#world.tick);
       this.#notice = `${toVCString(amount)} ins Portemonnaie.`;
     });
@@ -171,7 +171,7 @@ class WorldStore {
 
   pay(guestId: number): void {
     this.#guard(() => {
-      const paid = payGuest(this.#ledger, guestId, this.#world.tick);
+      const paid = payGuest(this.#world, this.#ledger, guestId, this.#world.tick);
       this.#notice = paid > 0 ? `${toVCString(paid)} an Gast ausgezahlt.` : 'Keine offene Auszahlung.';
     });
   }
@@ -245,4 +245,3 @@ class WorldStore {
 }
 
 export const worldStore = new WorldStore();
-export { TICK_MS };

@@ -1,3 +1,7 @@
+/**
+ * @test-target: src/core/economy/ledger.ts
+ * @error-code: ERR-1002
+ */
 import { describe, expect, it } from 'vitest';
 import { InsufficientFundsError, Ledger, type AccountId } from '../ledger';
 import { Prng } from '../../rng/prng';

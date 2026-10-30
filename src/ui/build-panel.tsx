@@ -26,7 +26,7 @@ const TEMPLATES: readonly { id: TemplateId; name: string; note: string; cost: nu
 
 export function BuildPanel(props: Props) {
   const { view, placing, onClose, onPick, onTemplate, onHire, onFire, onPrice, onCarpet, onRepair, onClean } = props;
-  const broken = view.furniture.filter((item) => item.condition < 85).sort((a, b) => a.condition - b.condition).slice(0, 4);
+  const broken = view.furniture.filter((item) => item.condition < 85 || item.damaged).sort((a, b) => a.condition - b.condition).slice(0, 4);
   return (
     <aside className="build-panel" aria-label="Bauen">
       <header className="build-head">
@@ -73,7 +73,7 @@ export function BuildPanel(props: Props) {
               type="button"
               className={`template-card${view.template === template.id ? ' active' : ''}`}
               onClick={() => onTemplate(template.id)}
-              disabled={view.template === template.id}
+              disabled={view.template === template.id || view.house < template.cost * 10_000}
             >
               <strong>{template.name}</strong>
               <span>{template.note}</span>
@@ -120,12 +120,12 @@ export function BuildPanel(props: Props) {
 
         <h3>Betrieb</h3>
         <div className="ops-row">
-          <button type="button" className="btn" onClick={onClean} disabled={view.dirtyTiles.length === 0}>
-            PUTZEN {view.dirtyTiles.length > 0 ? `(${view.dirtyTiles.length})` : ''}
+          <button type="button" className="btn" onClick={onClean} disabled={view.dirtyTiles.length === 0 || view.house < view.prices.cleaningCost * view.dirtyTiles.length}>
+            PUTZEN {view.dirtyTiles.length > 0 ? `(${view.dirtyTiles.length}) · ${vc(view.prices.cleaningCost * view.dirtyTiles.length, 2)}` : ''}
           </button>
           {broken.map((item) => (
-            <button key={item.id} type="button" className="btn repair" onClick={() => onRepair(item.id)}>
-              {item.label} reparieren · {vc(view.prices.repairCost * (100 - Math.floor(item.condition)), 0)}
+            <button key={item.id} type="button" className="btn repair" onClick={() => onRepair(item.id)} disabled={view.house < view.prices.repairCost}>
+              {item.label} reparieren · {vc(view.prices.repairCost, 0)}
             </button>
           ))}
           {broken.length === 0 && <small className="muted">Alles heil.</small>}

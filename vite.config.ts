@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import { GovernanceReporter } from './src/core/governance/test-harness';
 
 export default defineConfig({
   plugins: [react()],
@@ -10,6 +11,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    reporters: ['default', new GovernanceReporter()],
     testTimeout: 40_000,
   },
 });

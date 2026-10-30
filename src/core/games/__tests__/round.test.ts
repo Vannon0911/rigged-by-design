@@ -1,3 +1,7 @@
+/**
+ * @test-target: src/core/games/round.ts
+ * @error-code: ERR-1003
+ */
 import { describe, expect, it } from 'vitest';
 import { Ledger } from '../../economy/ledger';
 import { fromVC } from '../../economy/vacoin';

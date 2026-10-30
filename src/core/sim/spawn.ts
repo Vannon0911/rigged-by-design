@@ -7,7 +7,7 @@ import { exchangePoint, pathTo, spawnPoint } from './world';
 
 const MAX_GUESTS: Record<WorldState['template'], number> = { SMALL: 10, MEDIUM: 18, LARGE: 28 };
 
-export function maxGuests(world: WorldState): number {
+function maxGuests(world: WorldState): number {
   return MAX_GUESTS[world.template];
 }
 

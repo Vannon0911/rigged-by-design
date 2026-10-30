@@ -11,6 +11,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { fail } from './lib/report.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SRC_DIR = join(ROOT, 'src');
@@ -70,10 +71,9 @@ for (const file of files) {
 }
 
 if (violations.length > 0) {
-  console.error(`\ncheck:loc - ${violations.length} Datei(en) ueberschreiten das LOC-Cap:`);
-  for (const file of violations) {
-    console.error(`  - ${file.name}: ${file.lines} LOC (erlaubt ${file.limit}, Regel 200 / Exception 350)`);
-  }
+  violations.forEach((file, index) => {
+    fail(index + 1, 'ERR-4012', file.name, `${file.lines} LOC (erlaubt ${file.limit}, Regel 200 / Exception 350)`);
+  });
   process.exit(1);
 }
 

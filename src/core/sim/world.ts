@@ -1,11 +1,7 @@
 /** Welt-Helfer: Zonen, Objekte, Reservierungen, freie Plaetze. */
-import { blockedTiles, approachPoint, findPath, nearestWalkable } from './pathfinding';
+import { canPlaceAt } from './grid-zones';
+import { blockedTiles, approachPoint, findPath, isWalkable, nearestWalkable } from './pathfinding';
 import type { Furniture, Guest, Point, WorldState, Zone } from './types';
-
-export function zoneOf(world: WorldState, point: Point): Zone | null {
-  return world.zones.find((zone) =>
-    point.x >= zone.x && point.y >= zone.y && point.x < zone.x + zone.w && point.y < zone.y + zone.h) ?? null;
-}
 
 export function zoneById(world: WorldState, id: string): Zone | null {
   return world.zones.find((zone) => zone.id === id) ?? null;
@@ -35,6 +31,18 @@ export function interactionPoint(world: WorldState, item: Furniture): Point | nu
   return approachPoint(world.size, blockedTiles(world.size, world.furniture), item);
 }
 
+/** Jeder Sitz bekommt ein eigenes Zugaengliches Tile; sonst stehen alle Gaeste auf demselben Punkt. */
+export function seatPoint(world: WorldState, item: Furniture, seat: number): Point | null {
+  const blocked = blockedTiles(world.size, world.furniture);
+  const candidates: Point[] = [];
+  for (let x = item.x; x < item.x + item.w; x += 1) candidates.push({ x, y: item.y + item.h });
+  for (let y = item.y; y < item.y + item.h; y += 1) candidates.push({ x: item.x + item.w, y });
+  for (let x = item.x + item.w - 1; x >= item.x; x -= 1) candidates.push({ x, y: item.y - 1 });
+  for (let y = item.y + item.h - 1; y >= item.y; y -= 1) candidates.push({ x: item.x - 1, y });
+  const free = candidates.filter((point) => isWalkable(world.size, blocked, point.x, point.y));
+  return free[Math.abs(seat) % free.length] ?? approachPoint(world.size, blocked, item);
+}
+
 export function pathTo(world: WorldState, from: Point, to: Point): Point[] {
   return findPath(world.size, blockedTiles(world.size, world.furniture), from, to);
 }
@@ -52,23 +60,8 @@ export function exchangePoint(world: WorldState): Point | null {
   return desk ? interactionPoint(world, desk) : null;
 }
 
-export function freeFurniture(world: WorldState, kinds: readonly Furniture['kind'][]): Furniture | null {
-  return world.furniture.find((item) => kinds.includes(item.kind) && freeSeat(item)) ?? null;
-}
-
 export function guestById(world: WorldState, id: number): Guest | null {
   return world.guests.find((guest) => guest.id === id) ?? null;
-}
-
-export function guestTargetPoint(world: WorldState, guest: Guest): Point | null {
-  const item = furnitureById(world, guest.targetFurniture);
-  if (item) return interactionPoint(world, item);
-  const zone = zoneById(world, guest.targetZone);
-  if (!zone) return null;
-  return nearestWalkable(world.size, blockedTiles(world.size, world.furniture), {
-    x: zone.x + Math.floor(zone.w / 2),
-    y: zone.y + Math.floor(zone.h / 2),
-  });
 }
 
 export function sendGuest(world: WorldState, guest: Guest, target: Point): void {
@@ -76,8 +69,7 @@ export function sendGuest(world: WorldState, guest: Guest, target: Point): void 
   guest.pathIndex = 0;
 }
 
-export function canPlace(world: WorldState, x: number, y: number, w: number, h: number): boolean {
-  if (x < 1 || y < 1 || x + w >= world.size - 1 || y + h >= world.size - 1) return false;
-  return !world.furniture.some((item) =>
-    x < item.x + item.w && x + w > item.x && y < item.y + item.h && y + h > item.y);
+export function canPlace(world: WorldState, x: number, y: number, w: number, h: number, needsAccess = true): boolean {
+  const blockers = [world.player.position, ...world.guests.map((guest) => guest.position)];
+  return canPlaceAt(world.size, world.furniture, blockers, x, y, w, h, needsAccess);
 }

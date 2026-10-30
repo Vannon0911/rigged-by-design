@@ -5,7 +5,7 @@
  */
 import { addVC, canAfford, subVC, toVCString, ZERO_VC, type VaCoinMicro } from './vacoin';
 
-export const BASE_ACCOUNTS = [
+const BASE_ACCOUNTS = [
   'EXTERNAL_WORLD',
   'WECHSELKASSE',
   'HAUSKONTO',
@@ -17,13 +17,13 @@ export const BASE_ACCOUNTS = [
 
 export type AccountId = string;
 
-export const MINTING_ACCOUNT = 'EXTERNAL_WORLD';
+const MINTING_ACCOUNT = 'EXTERNAL_WORLD';
 
-export function isMintingAccount(account: AccountId): boolean {
+function isMintingAccount(account: AccountId): boolean {
   return account === MINTING_ACCOUNT;
 }
 
-export class LedgerError extends Error {
+class LedgerError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'LedgerError';
@@ -45,7 +45,7 @@ export class InsufficientFundsError extends LedgerError {
   }
 }
 
-export interface LedgerEntry {
+interface LedgerEntry {
   readonly seq: number;
   readonly tick: number;
   readonly from: AccountId;

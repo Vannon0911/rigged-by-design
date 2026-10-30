@@ -1,14 +1,17 @@
 /** Geldwege: jeder Cent ist eine Ledger-Buchung, nie ein direkter Zähler. */
 import type { Ledger } from '../economy/ledger';
-import { ZERO_VC, type VaCoinMicro } from '../economy/vacoin';
+import { fromVC, ZERO_VC, type VaCoinMicro } from '../economy/vacoin';
 
 export const HAUSKONTO = 'HAUSKONTO';
 export const PORTEMONNAIE = 'PORTEMONNAIE';
 export const WECHSELKASSE = 'WECHSELKASSE';
-export const EXTERNAL = 'EXTERNAL_WORLD';
+const EXTERNAL = 'EXTERNAL_WORLD';
 export const SHOP = 'SHOP';
 export const STAFF = 'STAFF';
 export const UTILITIES = 'UTILITIES';
+
+/** Betriebsreserve, die beim Abheben im Hauskonto bleibt. */
+export const HOUSE_FLOAT = fromVC(5);
 
 export const guestAccount = (id: number): string => `VISITOR_${id}`;
 export const pendingAccount = (id: number): string => `PENDING_${id}`;

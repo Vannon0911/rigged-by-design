@@ -111,7 +111,9 @@ Alle Gates:
 npm run verify:all
 ```
 
-Das sind LOC-Guard, Typecheck, Tests und Production-Build.
+Die Fail-Closed-Pipeline führt Autofix, ESLint, LOC-Guard, Typecheck, Testvertrag, Dead-Export-Gate, Dependency-Matrix, `npm audit`, Vitest und Production-Build aus. Jede Fehlermeldung hat das Format `[IDX-XXXX] [ERR-YYYY] Komponente: Klartext`; neue Fehlerarten stehen in [docs/ERROR_CATALOG.md](docs/ERROR_CATALOG.md).
+
+**Delivery-Regel:** Nach jedem abgeschlossenen Arbeits-Turn wird ungefragt auf den aktuellen Branch gepusht. Der verbindliche Weg ist `npm run turn:finish` — Autofix, alle Gates, deutscher Steam-Developer-Notes-Commit ohne Drittanbieter-Trailer, sofortiger Push. Details in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Tests
 

@@ -2,11 +2,14 @@
 import type { Ledger } from '../economy/ledger';
 import { ZERO_VC, type VaCoinMicro } from '../economy/vacoin';
 import type { Prng } from '../rng/prng';
+import { dirtyNear } from './emotion';
 import { actAtTarget, becomeAngry, chooseActivity, moveGuest, payAndLeave, releaseAndChoose } from './guests';
-import { admitFiat, exchangeToVc, guestAccount, HAUSKONTO, STAFF, UTILITIES } from './money';
+import { admitFiat, exchangeToVc, guestAccount, HAUSKONTO, pendingAccount, STAFF, UTILITIES } from './money';
 import { spawnChance, spawnGuest } from './spawn';
 import type { Guest, WorldState } from './types';
 import { exchangePoint, furnitureById, sendGuest } from './world';
+
+const CASHIER_WAIT = 12;
 
 function arriveAtDesk(world: WorldState, ledger: Ledger, prng: Prng, guest: Guest): boolean {
   if (guest.queueIndex > 0) return false;
@@ -15,7 +18,6 @@ function arriveAtDesk(world: WorldState, ledger: Ledger, prng: Prng, guest: Gues
     exchangeToVc(ledger, guest.id, guest.fiat, world.tick);
   } catch { /* Kasse geschlossen */ }
   guest.fiat = ZERO_VC;
-  guest.bubble = 'Chips!';
   chooseActivity(world, guest, ledger, prng);
   return true;
 }
@@ -23,12 +25,13 @@ function arriveAtDesk(world: WorldState, ledger: Ledger, prng: Prng, guest: Gues
 function angerTick(world: WorldState, ledger: Ledger, prng: Prng, guest: Guest): void {
   guest.stateTicks += 1;
   if (guest.stateTicks === 1) {
-    const candidates = world.furniture.filter((item) => item.kind !== 'DECOR' && item.kind !== 'EXCHANGE');
+    const candidates = world.furniture.filter((item) => item.kind !== 'EXCHANGE');
     const target = candidates[prng.nextInt(0, Math.max(0, candidates.length - 1))];
     const guard = world.staff.guard;
     if (target && prng.nextFloat() < (guard ? 0.16 : 0.72)) {
       const damage = 8 + prng.nextInt(0, 24);
       target.condition = Math.max(0, target.condition - damage);
+      target.damaged = true;
       world.dirty.add((target.y + 1) * world.size + target.x + 1);
       world.lastEvent = `${guest.name} hat ${target.label} beschädigt.`;
     } else {
@@ -38,7 +41,7 @@ function angerTick(world: WorldState, ledger: Ledger, prng: Prng, guest: Guest):
   if (guest.stateTicks > 4) {
     if (ledger.getBalance(guestAccount(guest.id)) > ZERO_VC || ledger.getBalance(`PENDING_${guest.id}`) > ZERO_VC) {
       const desk = exchangePoint(world);
-      if (desk) { guest.state = 'CASHOUT'; guest.path = []; sendGuest(world, guest, desk); return; }
+      if (desk) { guest.state = 'CASHOUT'; guest.stateTicks = 0; guest.path = []; sendGuest(world, guest, desk); return; }
     }
     payAndLeave(world, ledger, guest);
   }
@@ -47,6 +50,8 @@ function angerTick(world: WorldState, ledger: Ledger, prng: Prng, guest: Guest):
 function exchangeQueue(world: WorldState): void {
   const queue = world.guests.filter((guest) => guest.state === 'EXCHANGE').sort((a, b) => a.id - b.id);
   queue.forEach((guest, index) => { guest.queueIndex = index; });
+  const cashier = world.guests.filter((guest) => guest.state === 'CASHOUT').sort((a, b) => a.id - b.id);
+  cashier.forEach((guest, index) => { guest.queueIndex = index; });
 }
 
 function guestTick(world: WorldState, ledger: Ledger, prng: Prng, guest: Guest): void {
@@ -54,7 +59,7 @@ function guestTick(world: WorldState, ledger: Ledger, prng: Prng, guest: Guest):
     const point = exchangePoint(world);
     if (!point) return;
     if (guest.path.length === 0) sendGuest(world, guest, point);
-    if (moveGuest(guest)) { guest.state = 'EXCHANGE'; guest.stateTicks = 0; guest.bubble = 'Chips, bitte.'; }
+    if (moveGuest(guest)) { guest.state = 'EXCHANGE'; guest.stateTicks = 0; }
     return;
   }
   if (guest.state === 'EXCHANGE') {
@@ -64,6 +69,13 @@ function guestTick(world: WorldState, ledger: Ledger, prng: Prng, guest: Guest):
     return;
   }
   if (guest.state === 'CHOOSE') { chooseActivity(world, guest, ledger, prng); return; }
+  // Lounge-Warten hat kein Moebelziel und darf nicht jede Tick neu wuerfeln.
+  if (guest.state === 'WAIT' && guest.targetFurniture === 0) {
+    if (!moveGuest(guest)) return;
+    guest.stateTicks += 1;
+    if (guest.stateTicks > 3) { releaseAndChoose(world, guest); chooseActivity(world, guest, ledger, prng); }
+    return;
+  }
   if (guest.state === 'PLAY' || guest.state === 'DRINK' || guest.state === 'TOILET' || guest.state === 'WAIT') {
     if (!moveGuest(guest)) return;
     const item = furnitureById(world, guest.targetFurniture);
@@ -75,7 +87,13 @@ function guestTick(world: WorldState, ledger: Ledger, prng: Prng, guest: Guest):
     const point = exchangePoint(world);
     if (!point) { payAndLeave(world, ledger, guest); return; }
     if (guest.path.length === 0) sendGuest(world, guest, point);
-    if (moveGuest(guest)) payAndLeave(world, ledger, guest);
+    if (!moveGuest(guest)) return;
+    if (ledger.getBalance(pendingAccount(guest.id)) > ZERO_VC && guest.stateTicks < CASHIER_WAIT) {
+      guest.stateTicks += 1;
+      guest.patience = Math.max(0, guest.patience - 1);
+      return;
+    }
+    payAndLeave(world, ledger, guest);
     return;
   }
   if (guest.state === 'LEAVE') {
@@ -120,9 +138,20 @@ function releaseOrphanSeats(world: WorldState): void {
 }
 
 function decay(world: WorldState): void {
+  const dirty = [...world.dirty];
   for (const guest of world.guests) {
+    if (guest.state === 'ANGRY') continue;
+    const spotted = dirtyNear(dirty, world.size, guest.position.x, guest.position.y, 2);
+    if (spotted) {
+      guest.mood = Math.max(0, guest.mood - 0.12);
+      guest.patience = Math.max(0, guest.patience - 0.06);
+    } else {
+      guest.mood = Math.min(100, guest.mood + 0.03);
+      guest.patience = Math.min(100, guest.patience + 0.02);
+    }
     if (guest.state === 'CHOOSE' || guest.state === 'WAIT') guest.mood = Math.max(0, guest.mood - 0.04);
-    if (guest.mood < 12 && guest.state !== 'ANGRY' && guest.patience < 18) becomeAngry(world, guest);
+    // Wer schon geht, randaliert nicht mehr; sonst wechselt der Gast endlos zwischen LEAVE und ANGRY.
+    if (guest.mood < 20 && guest.state !== 'LEAVE') becomeAngry(world, guest);
   }
 }
 

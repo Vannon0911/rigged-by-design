@@ -1,11 +1,12 @@
 /** Angebot: kaufbare Spiele, Deko und Mods. Jeder Mod zieht an und kostet Geduld oder Betrieb. */
 import { fromVC, type VaCoinMicro } from '../economy/vacoin';
+import { GAME_FOOTPRINT } from './grid-zones';
 import { getPersona } from './personas';
 import type { Furniture, GameId, Guest, ModId, WorldState } from './types';
 
 export type BuildId = GameId | 'PLANT' | 'SOFA';
 
-export interface BuildDef {
+interface BuildDef {
   readonly id: BuildId;
   readonly name: string;
   readonly gameId?: GameId;
@@ -21,26 +22,30 @@ export interface BuildDef {
 }
 
 const game = (
-  id: GameId, name: string, kind: Furniture['kind'], w: number, h: number,
-  seats: number, cost: number, bet: number, quality: number, reels: number, description: string,
-): BuildDef => ({
-  id, name, gameId: id, kind, w, h, seats, cost: fromVC(cost), baseBet: fromVC(bet), quality, reels, description,
-});
+  id: GameId, name: string, kind: Furniture['kind'],
+  cost: number, bet: number, quality: number, reels: number, description: string,
+): BuildDef => {
+  const fp = GAME_FOOTPRINT[id];
+  return {
+    id, name, gameId: id, kind, w: fp.w, h: fp.h, seats: fp.seats,
+    cost: fromVC(cost), baseBet: fromVC(bet), quality, reels, description,
+  };
+};
 
 export const BUILD_DEFS: readonly BuildDef[] = [
-  game('SLOT', 'Rostiger 3-Walzen-Slot', 'SLOT', 2, 3, 1, 8, 0.1, 1, 3, 'Drei Walzen, eine Linie. Der Klassiker, der nie ganz sauber wird.'),
-  game('PLINKO', 'Plinko-Kabinett', 'SLOT', 2, 3, 1, 16, 0.1, 1, 1, 'Kugeln fallen sichtbar. Gäste bleiben für den einen Tropfen Glück.'),
-  game('BLACKJACK', 'Blackjack-Tisch', 'TABLE', 3, 3, 3, 24, 0.25, 2, 0, 'Drei Plätze, klare Regeln, hohe Nachfrage bei Business-Gästen.'),
-  game('POKER', 'Poker-Tisch', 'TABLE', 4, 3, 4, 32, 0.5, 2, 0, 'Vier Plätze. Wer hier sitzt, will nicht nur spielen, sondern gewinnen.'),
-  game('ROULETTE', 'Roulette-Tisch', 'TABLE', 4, 4, 4, 42, 0.5, 3, 0, 'Das Rad zieht High Roller magisch an. Teuer im Unterhalt.'),
-  game('SHELL', 'Hütchenspiel', 'TABLE', 3, 2, 2, 14, 0.1, 1, 0, 'Schnell, laut, ein bisschen unseriös. Perfekt für die Straße.'),
-  game('DICE', 'Würfeltisch', 'TABLE', 3, 3, 3, 20, 0.1, 1, 0, 'Einfach zu verstehen, schwer zu lassen.'),
+  game('SLOT', 'Rostiger 3-Walzen-Slot', 'SLOT', 8, 0.1, 1, 3, 'Ein Quadrat, eine Walze, ein Platz. Der Klassiker, der nie ganz sauber wird.'),
+  game('PLINKO', 'Plinko-Kabinett', 'SLOT', 16, 0.1, 1, 1, 'Kugeln fallen sichtbar. Gäste bleiben für den einen Tropfen Glück.'),
+  game('BLACKJACK', 'Blackjack-Tisch', 'TABLE', 24, 0.25, 2, 0, 'Vier Plätze, klare Regeln, hohe Nachfrage bei Business-Gästen.'),
+  game('POKER', 'Poker-Tisch', 'TABLE', 32, 0.5, 2, 0, 'Vier Plätze. Wer hier sitzt, will nicht nur spielen, sondern gewinnen.'),
+  game('ROULETTE', 'Roulette-Tisch', 'TABLE', 42, 0.5, 3, 0, 'Sechs Plätze am Rad. Zieht High Roller magisch an, teuer im Unterhalt.'),
+  game('SHELL', 'Hütchenspiel', 'TABLE', 14, 0.1, 1, 0, 'Ein Hütchen, ein Platz. Schnell, laut, ein bisschen unseriös.'),
+  game('DICE', 'Würfeltisch', 'TABLE', 20, 0.1, 1, 0, 'Zwei Plätze, ein Wurf. Einfach zu verstehen, schwer zu lassen.'),
   {
     id: 'PLANT', name: 'Grünpflanze', kind: 'DECOR', w: 1, h: 1, seats: 0, cost: fromVC(2),
     baseBet: fromVC(0), quality: 1, reels: 0, description: 'Macht den Raum weniger nach Lagerhalle.',
   },
   {
-    id: 'SOFA', name: 'Samtsofa', kind: 'DECOR', w: 3, h: 1, seats: 2, cost: fromVC(8),
+    id: 'SOFA', name: 'Samtsofa', kind: 'DECOR', w: 2, h: 1, seats: 2, cost: fromVC(8),
     baseBet: fromVC(0), quality: 2, reels: 0, description: 'Ein Platz zum Warten. Gäste bleiben länger, statt zu gehen.',
   },
 ];
@@ -52,7 +57,7 @@ export function getBuildDef(id: BuildId): BuildDef {
   return def;
 }
 
-export interface ModDef {
+interface ModDef {
   readonly id: ModId;
   readonly name: string;
   readonly description: string;
@@ -112,9 +117,14 @@ export function modEffects(item: Furniture): { attraction: number; patience: num
   return { attraction, patience, addiction, operating: operating as VaCoinMicro };
 }
 
+/** Zusatzwalzen erhoehen den Schauwert und damit den Zulauf. */
+function reelPull(item: Furniture): number {
+  return item.kind === 'SLOT' ? Math.max(0, item.reels - 3) * 90 : 0;
+}
+
 /** 0 = unspielbar. Hoeher = attraktiver. Persona-Geschmack, Preis, Zustand und Mods zaehlen. */
 export function offerScore(world: WorldState, guest: Guest, item: Furniture, wallet: VaCoinMicro): number {
-  if (!item.gameId || item.condition < 18 || item.seats <= item.occupants.length) return 0;
+  if (!item.gameId || item.damaged || item.condition < 18 || item.seats <= item.occupants.length) return 0;
   const persona = getPersona(guest.persona);
   const bet = Math.max(world.prices.slotMinBet, item.baseBet);
   if (bet > wallet) return 0;
@@ -122,18 +132,18 @@ export function offerScore(world: WorldState, guest: Guest, item: Furniture, wal
   const taste = persona.taste[item.gameId] ?? 0;
   const priceFriction = bet > wallet * 0.25 ? (bet / Math.max(1, wallet)) * 900 : 0;
   const moodFactor = 0.55 + guest.mood / 140;
-  return Math.max(1, Math.round((420 + item.quality * 160 + effects.attraction + taste) * moodFactor - priceFriction));
+  return Math.max(1, Math.round((420 + item.quality * 160 + effects.attraction + taste + reelPull(item)) * moodFactor - priceFriction));
 }
 
 export function attractionValue(item: Furniture): number {
-  return item.quality * 160 + modEffects(item).attraction;
+  return item.quality * 160 + modEffects(item).attraction + reelPull(item);
 }
 
 export function attractionOf(world: WorldState): number {
   let total = 0;
   for (const item of world.furniture) {
     if (item.kind === 'DECOR') total += item.quality * 120;
-    else if (item.gameId) total += item.quality * 180 + modEffects(item).attraction;
+    else if (item.gameId) total += item.quality * 180 + modEffects(item).attraction + reelPull(item);
   }
   return total;
 }

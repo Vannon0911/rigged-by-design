@@ -1,7 +1,7 @@
 /** Gästetypen: Budget, Geduld, Suchtneigung, Getränkeneigung und Spielgeschmack. */
 import type { GameId, PersonaId } from './types';
 
-export interface Persona {
+interface Persona {
   readonly id: PersonaId;
   readonly name: string;
   readonly description: string;
@@ -14,7 +14,7 @@ export interface Persona {
   readonly minTier: 1 | 2 | 3;
 }
 
-export const PERSONAS: readonly Persona[] = [
+const PERSONAS: readonly Persona[] = [
   {
     id: 'LUMPEN', name: 'Lumpen', description: 'Letztes Kleingeld, viel Zeit, wenig Anspruch.',
     budgetFactor: 0.45, patience: 112, addictionRate: 1.15, drinkRate: 0.5,

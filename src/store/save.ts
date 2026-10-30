@@ -1,11 +1,20 @@
 /** Save v5: Welt + Ledger-Log + PRNG. Nichts anderes besitzt Geld. */
 import { Ledger } from '../core/economy/ledger';
 import type { VaCoinMicro } from '../core/economy/vacoin';
+import { GAME_FOOTPRINT, SERVICE_FOOTPRINT } from '../core/sim/grid-zones';
 import { createWorld, ensureStarter } from '../core/sim/templates';
 import type { CarpetId, Furniture, Guest, Player, PriceBook, StaffState, TemplateId, WorldState } from '../core/sim/types';
 
 const KEY = 'vcoin.casino.v5';
 const OLD_KEYS = ['vcoin.casino.v3', 'vcoin.casino.v4'];
+
+function footprintOf(item: Furniture): { w: number; h: number; seats: number } | null {
+  if (item.gameId) return GAME_FOOTPRINT[item.gameId] ?? null;
+  if (item.kind === 'EXCHANGE' || item.kind === 'BAR' || item.kind === 'TOILET' || item.kind === 'STORAGE') {
+    return SERVICE_FOOTPRINT[item.kind];
+  }
+  return null;
+}
 
 interface SavedEntry {
   readonly tick: number;
@@ -15,7 +24,7 @@ interface SavedEntry {
   readonly reason: string;
 }
 
-export interface SavedGame {
+interface SavedGame {
   readonly version: 5;
   readonly template: TemplateId;
   readonly carpet: CarpetId;
@@ -67,12 +76,17 @@ export function loadWorld(): { world: WorldState; ledger: Ledger; prngState: num
     const saved = JSON.parse(raw) as Partial<SavedGame>;
     if (saved.version !== 5 || !saved.template || !Array.isArray(saved.guests) || !Array.isArray(saved.furniture)) return null;
     const world = createWorld(saved.template, saved.carpet ?? 'VIOLET');
-    world.furniture = saved.furniture.map((item) => ({
-      ...item,
-      occupants: [...(item.occupants ?? [])],
-      mods: [...(item.mods ?? [])],
-      reels: item.reels ?? 3,
-    }));
+    world.furniture = saved.furniture.map((item) => {
+      const fp = footprintOf(item);
+      return {
+        ...item,
+        w: fp?.w ?? item.w, h: fp?.h ?? item.h, seats: fp?.seats ?? item.seats,
+        damaged: item.damaged ?? false,
+        occupants: [...(item.occupants ?? [])],
+        mods: [...(item.mods ?? [])],
+        reels: item.reels ?? 3,
+      };
+    });
     world.guests = saved.guests.map((guest) => ({ ...guest, path: [...(guest.path ?? [])] }));
     world.player = { ...world.player, ...saved.player, path: [...(saved.player?.path ?? [])] };
     world.dirty = new Set(saved.dirty ?? []);

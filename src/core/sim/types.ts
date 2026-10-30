@@ -2,10 +2,10 @@
 import type { VaCoinMicro } from '../economy/vacoin';
 
 export type TemplateId = 'SMALL' | 'MEDIUM' | 'LARGE';
-export type ZoneKind = 'ENTRANCE' | 'EXCHANGE' | 'GAMING' | 'BAR' | 'TOILET' | 'STORAGE' | 'LOUNGE';
+type ZoneKind = 'ENTRANCE' | 'EXCHANGE' | 'GAMING' | 'BAR' | 'TOILET' | 'STORAGE' | 'LOUNGE';
 export type GameId = 'SLOT' | 'BLACKJACK' | 'POKER' | 'ROULETTE' | 'PLINKO' | 'SHELL' | 'DICE';
-export type GuestState = 'ENTER' | 'EXCHANGE' | 'CHOOSE' | 'WAIT' | 'PLAY' | 'DRINK' | 'TOILET' | 'CASHOUT' | 'LEAVE' | 'ANGRY';
-export type Need = 'play' | 'drink' | 'toilet' | 'social';
+type GuestState = 'ENTER' | 'EXCHANGE' | 'CHOOSE' | 'WAIT' | 'PLAY' | 'DRINK' | 'TOILET' | 'CASHOUT' | 'LEAVE' | 'ANGRY';
+type Need = 'play' | 'drink' | 'toilet' | 'social';
 export type PersonaId = 'LUMPEN' | 'STREET' | 'BUSINESS' | 'HIGH_ROLLER' | 'STAMMGAST';
 export type CarpetId = 'VIOLET' | 'CRIMSON' | 'JADE' | 'GOLD';
 export type ModId = 'NEON' | 'NEAR_MISS' | 'CHERRY' | 'FREE_DRINK' | 'EXTRA_REEL' | 'VELVET';
@@ -36,6 +36,7 @@ export interface Furniture {
   readonly price: VaCoinMicro;
   readonly quality: number;
   condition: number;
+  damaged: boolean;
   dirt: number;
   readonly zoneId: string;
   occupants: number[];
@@ -62,7 +63,6 @@ export interface Guest {
   targetZone: string;
   queueIndex: number;
   need: Need;
-  bubble: string;
   anger: number;
   dirtTimer: number;
   lastResult: string;

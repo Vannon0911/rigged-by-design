@@ -6,3 +6,6 @@ artifacts/
 .env
 .env.local
 .DS_Store
+docs/Chats/
+.turn-notes.md
+.git/TURN_COMMIT_MSG

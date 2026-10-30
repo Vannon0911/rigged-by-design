@@ -6,14 +6,12 @@ import { FloorView } from './floor-view';
 
 export interface FloorHandle {
   fit: () => void;
-  zoomIn: () => void;
-  zoomOut: () => void;
-  zoomToZone: (id: string) => void;
   cellAt: (clientX: number, clientY: number) => { x: number; y: number } | null;
 }
 
 interface Props {
   readonly view: GameView;
+  readonly placing: boolean;
   readonly onGuest: (id: number) => void;
   readonly onFurniture: (id: number) => void;
   readonly onEmpty: (x: number, y: number) => void;
@@ -29,9 +27,6 @@ export const FloorStage = forwardRef<FloorHandle, Props>(function FloorStage(pro
 
   useImperativeHandle(ref, () => ({
     fit: () => floor.current?.fit(),
-    zoomIn: () => floor.current?.zoomIn(),
-    zoomOut: () => floor.current?.zoomOut(),
-    zoomToZone: (id: string) => floor.current?.zoomToZone(id),
     cellAt: (clientX: number, clientY: number) => floor.current?.cellAt(clientX, clientY) ?? null,
   }), []);
 
@@ -50,17 +45,19 @@ export const FloorStage = forwardRef<FloorHandle, Props>(function FloorStage(pro
     }).then(() => {
       if (cancelled || !host.current) return;
       host.current.appendChild(instance.canvas);
+      if (import.meta.env.DEV) (window as Window & { __pixiApp?: Application }).__pixiApp = instance;
       floor.current = new FloorView(instance, latest.current.view, {
         onGuest: (id) => latest.current.onGuest(id),
         onFurniture: (id) => latest.current.onFurniture(id),
         onEmpty: (x, y) => latest.current.onEmpty(x, y),
       });
+      floor.current.setPlacing(latest.current.placing);
     });
 
     const observer = new ResizeObserver(() => {
       if (!instance.renderer || !host.current) return;
       instance.renderer.resize(host.current.clientWidth, host.current.clientHeight);
-      floor.current?.update(latest.current.view, true);
+      floor.current?.resize();
     });
     observer.observe(element);
 
@@ -77,6 +74,10 @@ export const FloorStage = forwardRef<FloorHandle, Props>(function FloorStage(pro
   useEffect(() => {
     floor.current?.update(props.view);
   }, [props.view]);
+
+  useEffect(() => {
+    floor.current?.setPlacing(props.placing);
+  }, [props.placing]);
 
   return <div className="floor-stage" ref={host} aria-label="Casino-Floor" />;
 });

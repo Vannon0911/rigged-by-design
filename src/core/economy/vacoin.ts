@@ -8,12 +8,12 @@ declare const vaCoinBrand: unique symbol;
 export type VaCoinMicro = number & { readonly [vaCoinBrand]: true };
 
 /** Mikro-Einheiten pro 1 VC (4 Nachkommastellen). */
-export const MICRO_PER_VC = 10_000;
+const MICRO_PER_VC = 10_000;
 /** Basispunkte: 10_000 bps = 100 %. */
-export const BPS_DENOMINATOR = 10_000;
+const BPS_DENOMINATOR = 10_000;
 export const ZERO_VC = 0 as VaCoinMicro;
 
-export class VaCoinError extends Error {
+class VaCoinError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'VaCoinError';
@@ -24,10 +24,6 @@ function assertSafeInteger(value: number, label: string): void {
   if (!Number.isSafeInteger(value)) {
     throw new VaCoinError(`${label}: sichere Ganzzahl erwartet, erhalten ${String(value)}`);
   }
-}
-
-export function isVaCoinMicro(value: unknown): value is VaCoinMicro {
-  return typeof value === 'number' && Number.isSafeInteger(value);
 }
 
 /** VC -> Mikro. Rundet kaufmaennisch (halbe Einheiten weg von 0) und deterministisch. */

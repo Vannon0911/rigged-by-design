@@ -1,7 +1,7 @@
 /** A* auf dem Tile-Grid. Deterministisch, 4 Richtungen, mit Blockern. */
 import type { Furniture, Point } from './types';
 
-export function tileIndex(size: number, x: number, y: number): number {
+function tileIndex(size: number, x: number, y: number): number {
   return y * size + x;
 }
 
@@ -27,7 +27,7 @@ export function isWalkable(size: number, blocked: Set<number>, x: number, y: num
   return x >= 0 && y >= 0 && x < size && y < size && !blocked.has(tileIndex(size, x, y));
 }
 
-export function neighbors(size: number, blocked: Set<number>, point: Point): Point[] {
+function neighbors(size: number, blocked: Set<number>, point: Point): Point[] {
   const result: Point[] = [];
   const steps = [[0, -1], [1, 0], [0, 1], [-1, 0]] as const;
   for (const [dx, dy] of steps) {

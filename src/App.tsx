@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { canPlaceAt } from './core/sim/grid-zones';
 import { getBuildDef, type BuildId } from './core/sim/offers';
 import type { CarpetId, TemplateId } from './core/sim/types';
 import { FloorStage, type FloorHandle } from './render/floor-stage';
@@ -9,15 +10,13 @@ import { GamesPopup } from './ui/games-popup';
 import { GuestPopup } from './ui/guest-popup';
 import { Hud } from './ui/hud';
 import { MachinePopup } from './ui/machine-popup';
-import { MiniMap } from './ui/mini-map';
 
 type Popup = { kind: 'guests'; guestId: number | null } | { kind: 'machine'; itemId: number } | { kind: 'games' } | null;
 
 function fits(view: GameView, id: BuildId, x: number, y: number): boolean {
   const def = getBuildDef(id);
-  if (x < 1 || y < 1 || x + def.w >= view.size - 1 || y + def.h >= view.size - 1) return false;
-  return !view.furniture.some((item) =>
-    x < item.x + item.w && x + def.w > item.x && y < item.y + item.h && y + def.h > item.y);
+  const blockers = [view.player.position, ...view.guests.map((guest) => guest.position)];
+  return canPlaceAt(view.size, view.furniture, blockers, x, y, def.w, def.h, def.seats > 0);
 }
 
 export default function App() {
@@ -70,7 +69,7 @@ export default function App() {
         onGuests={() => { setBuildOpen(false); setPopup({ kind: 'guests', guestId: null }); }}
         onVisit={() => { setBuildOpen(false); setPopup({ kind: 'games' }); }}
         onClean={() => worldStore.clean()}
-        onTakeHome={() => worldStore.takeHome(20)}
+        onOverview={() => stage.current?.fit()}
       />
 
       <main
@@ -86,6 +85,7 @@ export default function App() {
         <FloorStage
           ref={stage}
           view={view}
+          placing={Boolean(placing)}
           onGuest={(id) => { setBuildOpen(false); setPopup({ kind: 'guests', guestId: id }); }}
           onFurniture={(id) => { setBuildOpen(false); setPopup({ kind: 'machine', itemId: id }); }}
           onEmpty={(x, y) => {
@@ -95,19 +95,11 @@ export default function App() {
         />
 
         <div className="stage-legend">
-          <span><b>KLICK</b> laufen</span>
+          <span><b>KLICK</b> Bereich zoomen</span>
           <span><b>GAST</b> Budget</span>
           <span><b>OBJEKT</b> Zustand</span>
           <span><b>RAD</b> zoomen</span>
         </div>
-
-        <MiniMap
-          view={view}
-          onZone={(id) => stage.current?.zoomToZone(id)}
-          onFit={() => stage.current?.fit()}
-          onZoomIn={() => stage.current?.zoomIn()}
-          onZoomOut={() => stage.current?.zoomOut()}
-        />
 
         {placing && (
           <div className="place-hint">
@@ -149,7 +141,7 @@ export default function App() {
           view={view}
           onClose={() => setPopup(null)}
           onPlay={(game, bet, edge) => worldStore.playForeign(game, bet, edge)}
-          onTakeHome={() => worldStore.takeHome(20)}
+          onTakeHome={() => worldStore.takeHome(5)}
         />
       )}
 
