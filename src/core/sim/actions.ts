@@ -8,6 +8,9 @@ import { getMod } from './offers';
 import { blockedTiles, findPath, nearestWalkable } from './pathfinding';
 import type { CarpetId, Furniture, GameId, ModId, Point, WorldState } from './types';
 import { furnitureById } from './world';
+import { grantXp } from './player-rpg';
+
+const XP_CLEAN_TILE = 10;
 
 /**
  * Vor einem Umbau: erst alle Anspruche buchen, dann die Gaeste entfernen.
@@ -34,6 +37,7 @@ export function cleanTile(world: WorldState, ledger: Ledger, tile: number): void
   if (!world.dirty.has(tile)) return;
   ledger.transfer(HAUSKONTO, SHOP, world.prices.cleaningCost, 'reinigung', world.tick);
   world.dirty.delete(tile);
+  grantXp(world.player.rpg, XP_CLEAN_TILE);
 }
 
 export function cleanAll(world: WorldState, ledger: Ledger): number {
@@ -41,6 +45,7 @@ export function cleanAll(world: WorldState, ledger: Ledger): number {
   if (count === 0) return 0;
   ledger.transfer(HAUSKONTO, SHOP, (world.prices.cleaningCost * count) as VaCoinMicro, 'grossreinigung', world.tick);
   world.dirty.clear();
+  grantXp(world.player.rpg, XP_CLEAN_TILE * count);
   return count;
 }
 

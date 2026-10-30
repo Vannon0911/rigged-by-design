@@ -2,6 +2,8 @@
 import type { Ledger } from '../core/economy/ledger';
 import { addVC, ZERO_VC, type VaCoinMicro } from '../core/economy/vacoin';
 import { fiatAccount, guestAccount, pendingAccount, HAUSKONTO, PORTEMONNAIE, WECHSELKASSE } from '../core/sim/money';
+import { brawlWinChance } from '../core/sim/brawl-combat';
+import { talkChance } from '../core/sim/charisma-talk';
 import { reputation, serviceCapacity } from '../core/sim/spawn';
 import type { WorldState } from '../core/sim/types';
 import type { GameView } from './types';
@@ -31,6 +33,7 @@ function worldSnapshot(world: WorldState) {
     neonColor: world.neonColor,
     barLevel: world.barLevel,
     wcLevel: world.wcLevel,
+    activePenalties: world.activePenalties.map((penalty) => ({ ...penalty })),
   };
 }
 
@@ -47,6 +50,8 @@ export function buildView(world: WorldState, ledger: Ledger, notice: string): Ga
   }
   return {
     ...worldSnapshot(world),
+    talkChances: Object.fromEntries(world.guests.map((guest) => [guest.id, talkChance(world, guest.id)])),
+    brawlChance: brawlWinChance(world),
     house: ledger.getBalance(HAUSKONTO),
     wallet: ledger.getBalance(PORTEMONNAIE),
     desk: ledger.getBalance(WECHSELKASSE),

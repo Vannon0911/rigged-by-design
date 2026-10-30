@@ -1,6 +1,7 @@
 /** Ein einziger serialisierbarer Weltzustand. Geld liegt nicht hier, sondern im Ledger. */
 import type { VaCoinMicro } from '../economy/vacoin';
 import type { BuildId } from './offers';
+import type { PlayerRpgState } from './player-rpg';
 
 export type StaffRole = 'guard' | 'cleaner' | 'bartender' | 'cashier' | 'porter';
 
@@ -58,6 +59,8 @@ export interface Guest {
   mood: number;
   patience: number;
   addiction: number;
+  /** Tick, ab dem der Spieler diesen Gast erneut ansprechen darf (optional fuer alte Saves). */
+  talkReadyTick?: number;
   sociability: number;
   thirst: number;
   bladder: number;
@@ -82,6 +85,12 @@ export interface Player {
   path: Point[];
   pathIndex: number;
   carrying: string;
+  rpg: PlayerRpgState;
+}
+
+export interface ActivePenalty {
+  readonly kind: 'UNSAFE_REPUTATION' | 'MOOD_SHOCK';
+  daysLeft: number;
 }
 
 export interface PriceBook {
@@ -171,6 +180,7 @@ export interface WorldState {
   nextCrateId: number;
   nextAgentId: number;
   nextDisputeId: number;
+  activePenalties: ActivePenalty[];
 }
 
 export const TILE = 26;

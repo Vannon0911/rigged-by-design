@@ -1,6 +1,7 @@
 /** Drei Floor-Blueprints: klein, mittel, gross. Jeder Bereich ist 30x30 Kacheln. */
 import { fromVC, type VaCoinMicro } from '../economy/vacoin';
 import { getBuildDef } from './offers';
+import { newPlayerRpg } from './player-rpg';
 import { BLUEPRINTS } from './house-presets';
 import type { CarpetId, PriceBook, TemplateId, WorldState } from './types';
 
@@ -36,7 +37,7 @@ export function createWorld(template: TemplateId, carpet: CarpetId = 'VIOLET'): 
     zones: blueprint.zones,
     furniture: blueprint.furniture(),
     guests: [],
-    player: { position: { x: entrance ? entrance.x + 2 : 2, y: entrance ? entrance.y + 2 : 15 }, path: [], pathIndex: 0, carrying: '' },
+    player: { position: { x: entrance ? entrance.x + 2 : 2, y: entrance ? entrance.y + 2 : 15 }, path: [], pathIndex: 0, carrying: '', rpg: newPlayerRpg() },
     dirty: new Set<number>(),
     prices: { ...PRICES },
     staff: { guard: false, cleaner: false, bartender: false, cashier: false, porter: false },
@@ -58,6 +59,7 @@ export function createWorld(template: TemplateId, carpet: CarpetId = 'VIOLET'): 
     nextCrateId: 1,
     nextAgentId: 1,
     nextDisputeId: 1,
+    activePenalties: [],
     lastEvent: template === 'SMALL' ? 'Kleine Bude eröffnet. Ein Automat steht gratis.' : 'Neues Haus eröffnet.',
     guardsHired: 0,
   };

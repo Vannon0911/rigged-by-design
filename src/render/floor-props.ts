@@ -172,6 +172,7 @@ export class FloorProps {
         marker = new Graphics();
         marker.circle(0, 0, TILE * (dispute.level > 1 ? 1.2 : 0.8)).stroke({ width: 3, color: 0xff4d5e });
         marker.circle(0, 0, 4).fill(0xff4d5e);
+        marker.star(0, 0, 8, TILE * 0.7, TILE * 0.45).fill({ color: 0xffd23f, alpha: 0.6 });
         marker.position.set((dispute.x + 0.5) * TILE, (dispute.y + 0.5) * TILE);
         this.#disputes.set(dispute.id, marker);
         this.#props.addChild(marker);

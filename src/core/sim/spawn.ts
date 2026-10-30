@@ -2,6 +2,7 @@
 import type { Ledger } from '../economy/ledger';
 import type { Prng } from '../rng/prng';
 import { admitFiat } from './money';
+import { UNSAFE_REPUTATION_SPAWN_FACTOR, MOOD_SHOCK_NEWCOMER_MALUS } from './penalty-pool';
 import { attractionOf } from './offers';
 import { makeGuest, randomFiat, randomPersona } from './traits';
 import type { Guest, WorldState } from './types';
@@ -24,7 +25,9 @@ export function reputation(world: WorldState): number {
 }
 
 export function spawnChance(world: WorldState): number {
-  return 0.015 + (reputation(world) / 100) * 0.075;
+  const base = 0.015 + (reputation(world) / 100) * 0.075;
+  const unsafe = world.activePenalties.some((penalty) => penalty.kind === 'UNSAFE_REPUTATION');
+  return unsafe ? base * UNSAFE_REPUTATION_SPAWN_FACTOR : base;
 }
 
 /** Ein Casino mit zwei Plaetzen zieht keine zehn Gaeste an; Sitzplaetze begrenzen den Andrang. */
@@ -40,6 +43,9 @@ export function spawnGuest(world: WorldState, prng: Prng, ledger: Ledger): Guest
   const spawn = spawnPoint(world);
   const fiat = randomFiat(prng, world.template, persona);
   const guest = makeGuest({ id, persona, prng, spawn });
+  if (world.activePenalties.some((penalty) => penalty.kind === 'MOOD_SHOCK')) {
+    guest.mood = Math.max(0, guest.mood - MOOD_SHOCK_NEWCOMER_MALUS);
+  }
   const target = exchangePoint(world);
   if (!target) return null;
   admitFiat(ledger, id, fiat, world.tick);

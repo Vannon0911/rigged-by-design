@@ -30,14 +30,14 @@ function resolveDispute(world: WorldState, id: number, calmed: boolean): void {
 }
 
 /** Zwei wütende Gäste in Reichweite prügeln sich statt einzeln zu toben. */
-export function maybeStartBrawl(world: WorldState, prng: Prng): void {
+export function maybeStartBrawl(world: WorldState, prng: Prng, forced = false): void {
   for (const guest of world.guests) {
     if (guest.state !== 'ANGRY' || guest.disputeId !== null) continue;
     const other = world.guests.find((entry) =>
       entry.id !== guest.id && entry.state === 'ANGRY' && entry.disputeId === null
       && dist(guest.position.x, guest.position.y, entry.position.x, entry.position.y) <= BRAWL_RANGE);
     if (!other) continue;
-    if (prng.nextFloat() > 0.5) continue;
+    if (!forced && prng.nextFloat() > 0.5) continue;
     const id = world.nextDisputeId++;
     world.disputes.push({
       id,

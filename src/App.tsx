@@ -73,6 +73,7 @@ export default function App() {
         onVisit={() => { setBuildOpen(false); setPopup({ kind: 'games' }); }}
         onClean={() => worldStore.clean()}
         onOverview={() => stage.current?.fit()}
+        onSkill={(attribute) => worldStore.spendSkill(attribute)}
       />
 
       <main
@@ -143,7 +144,7 @@ export default function App() {
       )}
 
       {popup?.kind === 'guests' && (
-        <GuestPopup view={view} selectedId={popup.guestId} onClose={() => setPopup(null)} onPay={(id) => worldStore.pay(id)} onServe={(id) => worldStore.serveDrink(id)} onCalm={(id) => worldStore.calm(id)} />
+        <GuestPopup view={view} selectedId={popup.guestId} onClose={() => setPopup(null)} onPay={(id) => worldStore.pay(id)} onServe={(id) => worldStore.serveDrink(id)} onCalm={(id) => worldStore.calm(id)} onTalk={(id) => worldStore.talk(id)} onFight={(id) => worldStore.fightBrawl(id)} />
       )}
 
       {popup?.kind === 'games' && (

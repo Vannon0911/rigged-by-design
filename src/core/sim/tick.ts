@@ -4,6 +4,7 @@ import { ZERO_VC, type VaCoinMicro } from '../economy/vacoin';
 import type { Prng } from '../rng/prng';
 import { maybeStartBrawl, tickDisputes } from './disputes';
 import { dirtyNear } from './emotion';
+import { tickPenaltyDays } from './penalty-pool';
 import { actAtTarget, becomeAngry, chooseActivity, moveGuest, payAndLeave, releaseAndChoose } from './guests';
 import { exchangeFiat, guestAccount, HAUSKONTO, pendingAccount, STAFF, UTILITIES } from './money';
 import { tickNeeds } from './needs';
@@ -124,6 +125,7 @@ function staffTick(world: WorldState, ledger: Ledger): void {
   }
   if (world.tick % 600 !== 0) return;
   world.day += 1;
+  tickPenaltyDays(world);
   const wages = ((world.staff.guard ? world.prices.guardWage : 0)
     + (world.staff.cleaner ? world.prices.staffWage : 0)
     + (world.staff.bartender ? world.prices.staffWage : 0)

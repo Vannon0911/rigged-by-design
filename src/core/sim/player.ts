@@ -7,6 +7,10 @@ import { exchangeFiat, guestAccount, HAUSKONTO, SHOP } from './money';
 import { blockedTiles, findPath, nearestWalkable } from './pathfinding';
 import type { Furniture, Point, WorldState } from './types';
 import { exchangePoint, guestById, interactionPoint } from './world';
+import { grantXp } from './player-rpg';
+
+const XP_SERVE_GUEST = 8;
+const XP_OPEN_CRATE = 15;
 
 export function movePlayer(world: WorldState, target: Point): void {
   const walkable = nearestWalkable(world.size, blockedTiles(world.size, world.furniture), target);
@@ -42,6 +46,7 @@ export function serveDrink(world: WorldState, ledger: Ledger, guestId: number): 
   // Nur wer schon gespielt hat, koppelt den Drink an den Kick; sonst wird niemand vom Zuschauen süchtig.
   if (guest.spins > 0) guest.addiction = Math.min(100, guest.addiction + 2);
   world.player.carrying = '';
+  grantXp(world.player.rpg, XP_SERVE_GUEST);
   world.lastEvent = `${guest.name} hat einen Drink bekommen.`;
 }
 
@@ -55,6 +60,7 @@ export function pickupCrate(world: WorldState, crateId: number): void {
   }
   takeCrate(world, crateId, 'player');
   world.player.carrying = `KRATE:${crateId}`;
+  grantXp(world.player.rpg, XP_OPEN_CRATE);
 }
 
 function heldCrateId(world: WorldState): number {

@@ -12,13 +12,15 @@ interface Props {
   readonly onPay: (id: number) => void;
   readonly onServe: (id: number) => void;
   readonly onCalm: (disputeId: number) => void;
+  readonly onTalk: (guestId: number) => void;
+  readonly onFight: (disputeId: number) => void;
 }
 
 const PERSONA_LABEL: Record<string, string> = {
   LUMPEN: 'Lumpen', STREET: 'Straßentyp', BUSINESS: 'Business', HIGH_ROLLER: 'High Roller', STAMMGAST: 'Stammgast',
 };
 
-export function GuestPopup({ view, selectedId, onClose, onPay, onServe, onCalm }: Props) {
+export function GuestPopup({ view, selectedId, onClose, onPay, onServe, onCalm, onTalk, onFight }: Props) {
   const guests = [...view.guests].sort((a, b) => b.id - a.id);
   const [activeId, setActiveId] = useState(selectedId ?? guests[0]?.id ?? 0);
   useEffect(() => { if (selectedId !== null) setActiveId(selectedId); }, [selectedId]);
@@ -60,7 +62,9 @@ export function GuestPopup({ view, selectedId, onClose, onPay, onServe, onCalm }
           <div className="guest-actions">
             {view.player.carrying === 'DRINK' && <button type="button" className="btn small" onClick={() => onServe(guest.id)}>DRINK GEBEN</button>}
             {money.pending > 0 && <button type="button" className="btn primary small" onClick={() => onPay(guest.id)}>AUSZAHLEN</button>}
+            <button type="button" className="btn small" onClick={() => onTalk(guest.id)}>CHARISMA: BESCHWATZEN (Erfolg {view.talkChances[guest.id] ?? 0} %)</button>
             {guest.disputeId !== null && <button type="button" className="btn small" onClick={() => onCalm(guest.disputeId!)}>SCHLICHTEN</button>}
+            {guest.disputeId !== null && !view.staff.guard && <button type="button" className="btn small alert" onClick={() => onFight(guest.disputeId!)}>SELBER KÄMPFEN ({view.brawlChance} %)</button>}
           </div>
           <div className="guest-chips">
             {guests.map((entry) => {

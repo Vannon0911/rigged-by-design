@@ -9,11 +9,16 @@ interface HudProps {
   readonly onVisit: () => void;
   readonly onClean: () => void;
   readonly onOverview: () => void;
+  readonly onSkill: (attribute: 'speed' | 'charisma' | 'brawl') => void;
 }
+
+const PENALTY_LABEL = (kind: string): string =>
+  kind === 'UNSAFE_REPUTATION' ? 'Unsicherer Ruf' : kind === 'MOOD_SHOCK' ? 'Stimmungsschock' : 'Ausgeraubt';
 
 const MOOD_LABEL = (mood: number): string => (mood >= 65 ? 'gut' : mood >= 40 ? 'gemischt' : 'gereizt');
 
-export function Hud({ view, onBuild, onGuests, onVisit, onClean, onOverview }: HudProps) {
+export function Hud({ view, onBuild, onGuests, onVisit, onClean, onOverview, onSkill }: HudProps) {
+  const rpg = view.player.rpg;
   const dirty = view.dirtyTiles.length;
   const startTip = view.house === 0 && view.guests.length === 0;
   const mood = view.guests.length ? view.mood : 0;
@@ -73,6 +78,24 @@ export function Hud({ view, onBuild, onGuests, onVisit, onClean, onOverview }: H
           ÜBERSICHT
         </button>
       </div>
+
+      <div className="hud-rpg">
+        <span>LV {rpg.level}</span>
+        <small>XP {rpg.xp}/{rpg.level * 100}</small>
+        {rpg.unspentPoints > 0 && (
+          <>
+            <button type="button" className="btn warm" onClick={() => onSkill('speed')}>SPEED {rpg.speedLevel}</button>
+            <button type="button" className="btn warm" onClick={() => onSkill('charisma')}>CHARISMA {rpg.charismaLevel}</button>
+            <button type="button" className="btn warm" onClick={() => onSkill('brawl')}>KAMPF {rpg.brawlLevel}</button>
+          </>
+        )}
+      </div>
+
+      {view.activePenalties.map((penalty) => (
+        <div key={penalty.kind} className="hud-penalty" role="status">
+          {PENALTY_LABEL(penalty.kind)} · noch {penalty.daysLeft} Tag(e)
+        </div>
+      ))}
 
       {startTip && (
         <div className="hud-tip">

@@ -46,6 +46,7 @@ export function saveWorld(world: WorldState, ledger: Ledger, prngState: number):
       nextCrateId: world.nextCrateId,
       nextAgentId: world.nextAgentId,
       nextDisputeId: world.nextDisputeId,
+      activePenalties: world.activePenalties,
       lastEvent: world.lastEvent,
       entries: ledger.entries.map(({ tick, from, to, amount, reason }) => ({ tick, from, to, amount, reason })),
       prngState,

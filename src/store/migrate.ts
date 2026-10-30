@@ -2,7 +2,8 @@
 import { ZERO_VC, type VaCoinMicro } from '../core/economy/vacoin';
 import { GAME_FOOTPRINT, SERVICE_FOOTPRINT } from '../core/sim/grid-zones';
 import { reputation } from '../core/sim/spawn';
-import type { CarpetId, Crate, Dispute, Furniture, Guest, Player, PriceBook, StaffAgent, StaffState, TemplateId, WorldState } from '../core/sim/types';
+import { newPlayerRpg } from '../core/sim/player-rpg';
+import type { ActivePenalty, CarpetId, Crate, Dispute, Furniture, Guest, Player, PriceBook, StaffAgent, StaffState, TemplateId, WorldState } from '../core/sim/types';
 
 interface SavedEntry {
   readonly tick: number;
@@ -43,6 +44,7 @@ export interface SavedGame {
   readonly nextCrateId?: number;
   readonly nextAgentId?: number;
   readonly nextDisputeId?: number;
+  readonly activePenalties?: ActivePenalty[];
   readonly lastEvent: string;
   readonly entries: readonly SavedEntry[];
   readonly prngState: number;
@@ -84,7 +86,7 @@ export function hydrateWorld(world: WorldState, saved: SavedGame): Array<{ id: n
       path: [...(guest.path ?? [])],
     };
   });
-  world.player = { ...world.player, ...saved.player, path: [...(saved.player?.path ?? [])] };
+  world.player = { ...world.player, ...saved.player, path: [...(saved.player?.path ?? [])], rpg: { ...newPlayerRpg(), ...(saved.player?.rpg ?? {}) } };
   world.dirty = new Set(saved.dirty ?? []);
   world.prices = { ...world.prices, ...(saved.prices ?? {}) };
   world.staff = { ...world.staff, ...(saved.staff ?? {}) };
@@ -124,6 +126,7 @@ export function hydrateWorld(world: WorldState, saved: SavedGame): Array<{ id: n
       guest.disputeId = null;
     }
   }
+  world.activePenalties = (saved.activePenalties ?? []).map((penalty) => ({ ...penalty }));
   world.lastEvent = saved.lastEvent ?? 'Spielstand geladen.';
   return legacyFiat;
 }
