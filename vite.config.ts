@@ -13,5 +13,12 @@ export default defineConfig({
     include: ['src/**/*.test.ts'],
     reporters: ['default', new GovernanceReporter()],
     testTimeout: 40_000,
+    // Threads statt Prozess-Forks: sie sterben mit dem Runner, es bleiben keine
+    // verwaisten Worker-Prozesse zurueck. Der Teardown wird hart begrenzt,
+    // damit ein haengender Test den Lauf nicht blockiert.
+    pool: 'threads',
+    teardownTimeout: 2_000,
+    hookTimeout: 10_000,
+    maxConcurrency: 8,
   },
 });
