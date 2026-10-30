@@ -4,7 +4,7 @@ import type { Prng } from '../rng/prng';
 import { playBlackjack, playVideoPoker } from './engines/cards';
 import { playSlot } from './engines/slot';
 import { playShell, rollDice, spinRoulette } from './engines/table';
-import { createPlinkoBoard, PLINKO_POCKETS } from './plinko-board';
+import { createPlinkoBoard, PLINKO_POCKETS, type PlinkoDrop } from './plinko-board';
 
 interface RoundResult {
   readonly game: GameId;
@@ -17,14 +17,22 @@ interface RoundResult {
 const PLINKO_PAYOUT_BPS = [23_000, 26_000, 10_500, 0, 0, 0, 10_500, 26_000, 60_000] as const;
 const plinkoBoard = createPlinkoBoard();
 
+/** Alle Baelle des Wurfs zahlen zusammen; ein einzelner Ball bleibt die normale Runde. */
+function payoutOf(drop: PlinkoDrop): number {
+  return drop.pockets.reduce((total, pocket) => total + (PLINKO_PAYOUT_BPS[pocket] ?? 0), 0);
+}
+
 function plinko(prng: Prng): RoundResult {
   const drop = plinkoBoard.drop(prng);
-  const bps = PLINKO_PAYOUT_BPS[drop.pocket] ?? 0;
+  const bps = payoutOf(drop);
+  const lanes = drop.pockets.length > 1
+    ? `${drop.pockets.length}× ${drop.pockets.map((pocket) => pocket + 1).join('/')}`
+    : `${drop.pocket + 1}/${PLINKO_POCKETS}`;
   return {
     game: 'PLINKO',
     multiplierBps: bps,
     label: `Fach ${drop.pocket + 1} - ${(bps / 10_000).toFixed(2).replace('.', ',')}x`,
-    detail: ['●', `${drop.pocket + 1}/${PLINKO_POCKETS}`, `${drop.steps} Schritte`],
+    detail: ['●', lanes, `${drop.steps} Schritte`],
   };
 }
 
