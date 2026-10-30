@@ -1,14 +1,15 @@
 /** Bau-Popup: kaufen, liefern, Personal, Preise, Deko und Freischaltung. */
-import { BUILD_DEFS } from '../core/sim/offers';
+import { type BuildId } from '../core/sim/offers';
 import { CARPETS, type CarpetId, type StaffRole, type TemplateId } from '../core/sim/types';
 import type { GameView } from '../store/types';
+import { BuildCatalogCards } from './build-catalog-cards';
 import { ColorRow, CrateList, DisputeList, StaffGrid, TemplateGrid } from './build-panel-parts';
 import { vc } from './format';
 
 interface Props {
   readonly view: GameView;
   readonly onClose: () => void;
-  readonly onBuy: (id: (typeof BUILD_DEFS)[number]['id']) => void;
+  readonly onBuy: (id: BuildId) => void;
   readonly onTemplate: (id: TemplateId) => void;
   readonly onHire: (role: StaffRole) => void;
   readonly onFire: (role: StaffRole) => void;
@@ -50,30 +51,7 @@ export function BuildPanel(props: Props) {
         <p className="panel-note">Käufe kommen als Kiste am Eingang an. Abholen, tragen, aufstellen.</p>
 
         <h3>Spiele & Deko</h3>
-        <div className="build-grid">
-          {BUILD_DEFS.map((def) => {
-            const poor = view.house < def.cost;
-            return (
-              <button
-                key={def.id}
-                type="button"
-                draggable
-                className={`build-card${poor ? ' poor' : ''}`}
-                onDragStart={(event) => {
-                  event.dataTransfer.setData('text/build', def.id);
-                  event.dataTransfer.effectAllowed = 'copy';
-                }}
-                onClick={() => props.onBuy(def.id)}
-                disabled={poor}
-              >
-                <span className="build-icon">{def.gameId ? '▦' : '✿'}</span>
-                <strong>{def.name}</strong>
-                <small>{def.description}</small>
-                <b>{def.cost === 0 ? 'gratis' : vc(def.cost, 0)}</b>
-              </button>
-            );
-          })}
-        </div>
+        <BuildCatalogCards view={view} onBuy={props.onBuy} />
 
         <h3>Lieferungen {view.crates.length > 0 ? `(${view.crates.length})` : ''}</h3>
         <CrateList view={view} carriedId={carriedId} onPickup={props.onPickup} onUnload={props.onUnload} />

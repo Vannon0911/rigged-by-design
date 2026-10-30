@@ -4,7 +4,7 @@ import type { StaffRole, TemplateId } from '../core/sim/types';
 import type { GameView } from '../store/types';
 import { vc } from './format';
 
-export function Staff(props: { label: string; note: string; wage: number; on: boolean; onHire: () => void; onFire: () => void }) {
+function Staff(props: { label: string; note: string; wage: number; on: boolean; onHire: () => void; onFire: () => void }) {
   return (
     <div className={`staff${props.on ? ' on' : ''}`}>
       <div><strong>{props.label}</strong><small>{props.note} · {vc(props.wage, 0)}/Tag</small></div>

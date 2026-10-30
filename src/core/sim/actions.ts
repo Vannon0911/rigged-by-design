@@ -1,16 +1,16 @@
-/** Commands, die nicht im Tick passieren: Spieler, Bauen, Preise, Personal, fremde Spiele. */
+/** Commands, die nicht im Tick passieren: Bewegung, Reinigung, Preise, Mods, fremde Spiele. */
 import type { Ledger } from '../economy/ledger';
 import { fromVC, ZERO_VC, type VaCoinMicro } from '../economy/vacoin';
 import { playAction, type GameResult } from '../games/contracts';
 import type { Prng } from '../rng/prng';
-import { closeFiat, exchangeFromVc, foreignBet, foreignWin, guestAccount, HAUSKONTO, payPending, PORTEMONNAIE, SHOP, STAFF } from './money';
-import { getBuildDef, getMod, type BuildId } from './offers';
+import { closeFiat, exchangeFromVc, foreignBet, foreignWin, guestAccount, HAUSKONTO, payPending, PORTEMONNAIE, SHOP } from './money';
+import { getMod } from './offers';
 import { blockedTiles, findPath, nearestWalkable } from './pathfinding';
 import type { CarpetId, Furniture, GameId, ModId, Point, WorldState } from './types';
-import { canPlace, furnitureById, guestById, interactionPoint } from './world';
+import { furnitureById } from './world';
 
 /**
- * Vor einem Umbau: erst alle Ansprueruche buchen, dann die Gaeste entfernen.
+ * Vor einem Umbau: erst alle Anspruche buchen, dann die Gaeste entfernen.
  * Scheitert eine Buchung, bleibt die Welt unveraendert und der Fehler steigt auf.
  */
 export function settleGuests(world: WorldState, ledger: Ledger): void {
@@ -30,46 +30,6 @@ export function movePlayer(world: WorldState, target: Point): void {
   world.player.pathIndex = 0;
 }
 
-const near = (a: Point, b: Point, distance = 2): boolean => Math.abs(a.x - b.x) + Math.abs(a.y - b.y) <= distance;
-
-export function takeDrink(world: WorldState): void {
-  if (world.player.carrying === 'DRINK') throw new Error('Du traegst schon einen Drink.');
-  const bar = world.furniture.find((item) => item.kind === 'BAR');
-  const spot = bar ? interactionPoint(world, bar) : null;
-  if (!spot || !near(world.player.position, spot)) throw new Error('Geh erst zur Bar.');
-  world.player.carrying = 'DRINK';
-  world.lastEvent = 'Drink gezapft. Jetzt zum Gast bringen.';
-}
-
-export function serveDrink(world: WorldState, ledger: Ledger, guestId: number): void {
-  if (world.player.carrying !== 'DRINK') throw new Error('Du hast keinen Drink dabei.');
-  const guest = guestById(world, guestId);
-  if (!guest) throw new Error('Gast nicht gefunden.');
-  if (!near(world.player.position, guest.position, 3)) throw new Error('Geh erst zum Gast.');
-  const price = world.prices.drinkPrice;
-  if (ledger.getBalance(guestAccount(guest.id)) >= price) {
-    ledger.transfer(guestAccount(guest.id), HAUSKONTO, price, `gast ${guest.id} drink`, world.tick);
-  }
-  guest.mood = Math.min(100, guest.mood + 13);
-  guest.patience = Math.min(100, guest.patience + 12);
-  // Nur wer schon gespielt hat, koppelt den Drink an den Kick; sonst wird niemand vom Zuschauen süchtig.
-  if (guest.spins > 0) guest.addiction = Math.min(100, guest.addiction + 2);
-  world.player.carrying = '';
-  world.lastEvent = `${guest.name} hat einen Drink bekommen.`;
-}
-
-export function payGuest(world: WorldState, ledger: Ledger, guestId: number, tick: number): VaCoinMicro {
-  const amount = ledger.getBalance(`PENDING_${guestId}`);
-  if (amount <= ZERO_VC) return ZERO_VC;
-  ledger.transfer(`PENDING_${guestId}`, `VISITOR_${guestId}`, amount, `gast ${guestId} auszahlung`, tick);
-  const guest = guestById(world, guestId);
-  if (guest) {
-    guest.mood = Math.min(100, guest.mood + 6);
-    guest.patience = Math.min(100, guest.patience + 5);
-  }
-  return amount;
-}
-
 export function cleanTile(world: WorldState, ledger: Ledger, tile: number): void {
   if (!world.dirty.has(tile)) return;
   ledger.transfer(HAUSKONTO, SHOP, world.prices.cleaningCost, 'reinigung', world.tick);
@@ -84,26 +44,17 @@ export function cleanAll(world: WorldState, ledger: Ledger): number {
   return count;
 }
 
+/** Reparatur verbraucht ein Ersatzteil aus dem Lager; ohne Teile scheitert sie. */
 export function repair(world: WorldState, ledger: Ledger, itemId: number): void {
   const item = furnitureById(world, itemId);
-  if (!item || (item.condition >= 100 && !item.damaged)) return;
+  if (!item || (item.condition >= 100 && !item.damaged && !item.clogged)) return;
+  if (world.parts < 1) throw new Error('Keine Ersatzteile im Lager.');
   ledger.transfer(HAUSKONTO, SHOP, world.prices.repairCost, 'reparatur', world.tick);
+  world.parts -= 1;
   item.condition = 100;
   item.damaged = false;
-}
-
-export function hire(world: WorldState, ledger: Ledger, role: 'guard' | 'cleaner' | 'bartender'): void {
-  if (world.staff[role]) return;
-  const cost = role === 'guard' ? world.prices.guardWage : world.prices.staffWage;
-  ledger.transfer(HAUSKONTO, STAFF, cost, 'einstellung', world.tick);
-  world.staff[role] = true;
-  if (role === 'guard') world.guardsHired += 1;
-  world.lastEvent = `${role === 'guard' ? 'Guard' : role === 'cleaner' ? 'Reinigungskraft' : 'Barkeeper'} eingestellt.`;
-}
-
-export function fire(world: WorldState, role: 'guard' | 'cleaner' | 'bartender'): void {
-  world.staff[role] = false;
-  world.lastEvent = 'Personal entlassen.';
+  item.clogged = false;
+  item.clog = 0;
 }
 
 export function setPrice(world: WorldState, key: 'drinkPrice' | 'slotMinBet', value: VaCoinMicro): void {
@@ -113,21 +64,6 @@ export function setPrice(world: WorldState, key: 'drinkPrice' | 'slotMinBet', va
 
 export function setCarpet(world: WorldState, carpet: CarpetId): void {
   world.carpet = carpet;
-}
-
-export function build(world: WorldState, ledger: Ledger, buildId: BuildId, x: number, y: number): Furniture {
-  const def = getBuildDef(buildId);
-  if (!canPlace(world, x, y, def.w, def.h, def.seats > 0)) throw new Error('Da ist kein Platz.');
-  ledger.transfer(HAUSKONTO, SHOP, def.cost, `kauf ${def.name}`, world.tick);
-  const zone = world.zones.find((entry) =>
-    x >= entry.x && y >= entry.y && x < entry.x + entry.w && y < entry.y + entry.h);
-  const item: Furniture = {
-    id: world.nextFurnitureId++, kind: def.kind, gameId: def.gameId, x, y, w: def.w, h: def.h,
-    seats: def.seats, label: def.name, price: def.cost, quality: def.quality, condition: 100, damaged: false,
-    dirt: 0, zoneId: zone?.id ?? 'gaming', occupants: [], mods: [], reels: def.reels, baseBet: def.baseBet,
-  };
-  world.furniture.push(item);
-  return item;
 }
 
 export function installMod(world: WorldState, ledger: Ledger, itemId: number, modId: ModId): void {

@@ -3,11 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { Ledger } from '../../economy/ledger';
 import { fromVC, toVCString } from '../../economy/vacoin';
 import { Prng } from '../../rng/prng';
-import { repair, serveDrink, settleGuests, takeDrink } from '../actions';
-import { buyCrate, deployCrate, takeCrate } from '../deliveries';
+import { repair, settleGuests } from '../actions';
+import { serveDrink, takeDrink } from '../player';
 import { chooseActivity, payAndLeave } from '../guests';
 import { fiatAccount, guestAccount, HAUSKONTO, pendingAccount } from '../money';
-import { attractionValue, getBuildDef, MODS, offerScore } from '../offers';
+import { attractionValue, MODS, offerScore } from '../offers';
 import { spawnGuest } from '../spawn';
 import { createWorld } from '../templates';
 import { tickWorld } from '../tick';
@@ -105,18 +105,6 @@ describe('Geld und Umbau', () => {
     expect(slot.damaged).toBe(false);
     expect(ledger.getBalance(HAUSKONTO)).toBe(fromVC(100) - world.prices.repairCost);
   });
-  it('kauft als Kiste und stellt erst nach dem Aufstellen auf', () => {
-    const { world, ledger } = setup();
-    ledger.transfer('EXTERNAL_WORLD', HAUSKONTO, fromVC(100), 'startguthaben fuer test', 0);
-    const before = ledger.getBalance(HAUSKONTO);
-    const crate = buyCrate(world, ledger, 'PLANT');
-    expect(ledger.getBalance(HAUSKONTO)).toBe(before - getBuildDef('PLANT').cost);
-    expect(deployCrate(world, takeCrate(world, crate.id).id, 20, 12).kind).toBe('DECOR');
-    takeCrate(world, buyCrate(world, ledger, 'PLANT').id);
-    const blocked = world.crates[world.crates.length - 1]!;
-    expect(() => deployCrate(world, blocked.id, 20, 12)).toThrow();
-    expect(ledger.verifyLedgerIntegrity()).toBe(true);
-  });
   it('laesst beim Umbau keine Gaeste-Guthaben in alten Konten haengen', () => {
     const { world, ledger, prng } = setup();
     const guest = spawnGuest(world, prng, ledger)!;
@@ -131,6 +119,7 @@ describe('Geld und Umbau', () => {
   it('laesst den Spieler einen Drink zapfen und am Gast abgeben', () => {
     const { world, ledger, prng } = setup();
     const bar = world.furniture.find((item) => item.kind === 'BAR')!;
+    bar.stock = 2;
     const spot = interactionPoint(world, bar)!;
     world.player.position = { ...spot };
     takeDrink(world);

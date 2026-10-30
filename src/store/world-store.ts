@@ -5,9 +5,10 @@ import { fromVC, toVCString, ZERO_VC, type VaCoinMicro } from '../core/economy/v
 import type { GameResult } from '../core/games/contracts';
 import {
   cleanAll, cleanTile, foreignRound, installMod,
-  payGuest, repair, setBaseBet, setCarpet, setPrice,
+  repair, setBaseBet, setCarpet, setPrice,
   testSpin, upgradeReels,
 } from '../core/sim/actions';
+import { payGuest } from '../core/sim/service-actions';
 import {
   deployHeldCrate, movePlayer, pickupCrate, serveDesk, serveDrink,
   setNeonColor, setWallColor, storeHeldCrate, takeDrink, upgradeBar, upgradeWc,

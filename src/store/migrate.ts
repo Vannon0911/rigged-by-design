@@ -4,7 +4,7 @@ import { GAME_FOOTPRINT, SERVICE_FOOTPRINT } from '../core/sim/grid-zones';
 import { reputation } from '../core/sim/spawn';
 import type { CarpetId, Crate, Dispute, Furniture, Guest, Player, PriceBook, StaffAgent, StaffState, TemplateId, WorldState } from '../core/sim/types';
 
-export interface SavedEntry {
+interface SavedEntry {
   readonly tick: number;
   readonly from: string;
   readonly to: string;
@@ -13,7 +13,7 @@ export interface SavedEntry {
 }
 
 /** v5-Gaeste konnten noch ein Fiat-Feld tragen; ab v6 liegt es im Ledger. */
-export type SavedGuest = Guest & { readonly fiat?: VaCoinMicro };
+type SavedGuest = Guest & { readonly fiat?: VaCoinMicro };
 
 export interface SavedGame {
   readonly version: 5 | 6 | 7;
